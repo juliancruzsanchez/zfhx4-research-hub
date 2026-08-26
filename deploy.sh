@@ -17,25 +17,20 @@ git pull origin main
 
 echo "🔧 Installing function dependencies..."
 cd functions
-bun install
+npm install
 
 echo "🔨 Building functions..."
-bun run build
+npm run build
 
 cd ..
 
-echo "🔐 Setting GROQ_API_KEY secret (skip if already set)..."
-echo "   Run this once manually if you haven't:"
-echo "   cd functions && bunx firebase-tools functions:secrets:set GROQ_API_KEY"
-echo ""
-
 echo "🚀 Deploying functions + Firestore rules..."
-bunx firebase-tools deploy --only functions,firestore:rules
+npx firebase deploy --only functions,firestore:rules
 
 echo ""
 echo "✅ Deploy complete!"
 echo ""
 echo "To seed papers, run:"
-echo "   cd functions && GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json bun run seed"
+echo "   cd functions && GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node lib/seed.js"
 echo ""
 echo "Then click 'Refresh from PubMed' and 'Re-synthesize' in Workspace → Research papers tab."
