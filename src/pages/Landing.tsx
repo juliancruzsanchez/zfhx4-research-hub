@@ -449,7 +449,10 @@ export default function Landing() {
 
               {/* Input */}
               <form
-                onSubmit={handleSend}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }}
                 className="flex items-center gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5"
               >
                 <Input
