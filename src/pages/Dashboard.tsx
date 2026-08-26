@@ -19,7 +19,7 @@ export default function Dashboard() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium text-muted-foreground">
-              Authenticated workspace
+              ZFHX4 Research Hub
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight">
               Welcome{user?.name ? `, ${user.name}` : ""}
@@ -41,12 +41,10 @@ export default function Dashboard() {
             <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <LayoutDashboard className="size-5" />
             </div>
-            <CardTitle>Your dashboard is ready</CardTitle>
+            <CardTitle>Your customer research space is ready</CardTitle>
           </CardHeader>
           <CardContent className="text-sm leading-6 text-muted-foreground">
-            Replace this starter content with the product&apos;s authenticated
-            experience. The route is protected and sign-in returns here by
-            default.
+            You are signed in to your customer resource. Use this space to return to the ZFHX4 research experience whenever you need it.
           </CardContent>
         </Card>
       </div>

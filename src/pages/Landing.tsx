@@ -127,16 +127,14 @@ export default function Landing() {
     >
       <header className="border-b border-[#dce7e3] bg-[#fbfcfb]">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
-          <a href="/" className="flex items-center gap-3" aria-label="ZFHX4 Research home">
+          <a href="/" className="flex items-center gap-3" aria-label="ZFHX4 Research Hub home">
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]">
               <Dna className="size-[19px]" strokeWidth={1.8} />
             </span>
-            <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#18322f]">
-              ZFHX4 Research
-            </span>
+            <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#18322f]">ZFHX4 Research Hub</span>
           </a>
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
-            <span className="hidden sm:inline">A family-first paper index</span>
+            <span className="hidden sm:inline">A customer research resource</span>
             <span className="flex items-center gap-1.5 rounded-full border border-[#dce7e3] bg-white px-3 py-1.5 text-[#37665d]">
               <span className="size-1.5 rounded-full bg-[#3b9a7f]" />
               Version 1
@@ -157,7 +155,7 @@ export default function Landing() {
               <span className="flex size-6 items-center justify-center rounded-md bg-white text-[#397768] ring-1 ring-[#d4e7e0]">
                 <BookOpen className="size-3.5" />
               </span>
-              Research, made easier to find
+              Trusted research, easier to navigate
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 12 }}
@@ -173,7 +171,7 @@ export default function Landing() {
               transition={{ delay: 0.2, duration: 0.45 }}
               className="mt-6 max-w-xl text-base leading-7 text-[#58706b] sm:text-[17px]"
             >
-              A clear, growing collection of research about loss of function in ZFHX4, gathered for families and the people who support them.
+              A clear, growing collection of research about loss of function in ZFHX4, organized to help customers and their care teams understand the evidence.
             </motion.p>
           </div>
 
@@ -201,7 +199,7 @@ export default function Landing() {
               The library
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
-              Papers worth starting with
+              Research to start with
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#71837f]">
               {filteredPapers.length} {filteredPapers.length === 1 ? "paper" : "papers"} matching your view
@@ -307,7 +305,7 @@ export default function Landing() {
             This library is an information resource, not medical advice. Research findings can change as new evidence becomes available. Always discuss papers and individual care with your clinical team.
           </p>
           <p className="mt-2 flex items-center gap-1.5">
-            Curated for families <span className="text-[#b1c0bb">·</span> Links open at their original source
+            Prepared for customers <span className="text-[#b1c0bb">·</span> Links open at their original source
           </p>
         </footer>
       </section>
