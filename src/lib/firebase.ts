@@ -5,12 +5,12 @@ import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyCMxYTfot83W4txTDdW9wcCKMOVC4N2uz4",
+  authDomain: "zfhx4ai.firebaseapp.com",
+  projectId: "zfhx4ai",
+  storageBucket: "zfhx4ai.firebasestorage.app",
+  messagingSenderId: "537853698125",
+  appId: "1:537853698125:web:f3789e7f79f255b780fc04",
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
