@@ -79,9 +79,6 @@ export default defineConfig({
   },
   // Performance hints
   server: {
-    // Keep HMR on, but disable full-screen error overlay
-    hmr: {
-      overlay: false,
-    },
+    hmr: false,
   },
 });
