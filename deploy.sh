@@ -17,20 +17,20 @@ git pull origin main
 
 echo "🔧 Installing function dependencies..."
 cd functions
-npm install
+bun install
 
 echo "🔨 Building functions..."
-npm run build
+bun run build
 
 cd ..
 
 echo "🔐 Setting GROQ_API_KEY secret (skip if already set)..."
 echo "   Run this once manually if you haven't:"
-echo "   cd functions && npx firebase functions:secrets:set GROQ_API_KEY"
+echo "   cd functions && bunx firebase-tools functions:secrets:set GROQ_API_KEY"
 echo ""
 
 echo "🚀 Deploying functions + Firestore rules..."
-npx firebase deploy --only functions,firestore:rules
+bunx firebase-tools deploy --only functions,firestore:rules
 
 echo ""
 echo "✅ Deploy complete!"
