@@ -3,11 +3,8 @@ import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   updateDoc,
-  where,
   type Unsubscribe,
 } from "firebase/firestore";
 import {
@@ -55,41 +52,47 @@ export interface SiteContent {
   publishedPaperCount: number;
 }
 
-/** Subscribe to all published papers for the homepage. */
+/** Subscribe to all published papers for the homepage.
+ *  Uses a simple collection scan + client-side filter/sort to avoid
+ *  requiring a Firestore composite index. */
 export function subscribeToPublishedPapers(
   onChange: (papers: PublicPaper[]) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(firestore, "papers"),
-    where("status", "==", "published"),
-    orderBy("year", "desc"),
+  const q = collection(firestore, "papers");
+  return onSnapshot(
+    q,
+    (snap) => {
+      const papers = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<PublicPaper, "id">) }))
+        .filter((p) => p.status === "published")
+        .sort((a, b) => (b.year ?? "").localeCompare(a.year ?? ""));
+      onChange(papers);
+    },
+    (err) => {
+      console.error("subscribeToPublishedPapers error:", err);
+      onChange([]);
+    },
   );
-  return onSnapshot(q, (snap) => {
-    onChange(
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<PublicPaper, "id">),
-      })),
-    );
-  });
 }
 
 /** Subscribe to all papers (for admin review). */
 export function subscribeToAllPapers(
   onChange: (papers: PublicPaper[]) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(firestore, "papers"),
-    orderBy("discoveredAt", "desc"),
+  const q = collection(firestore, "papers");
+  return onSnapshot(
+    q,
+    (snap) => {
+      const papers = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<PublicPaper, "id">) }))
+        .sort((a, b) => (b.discoveredAt?.seconds ?? 0) - (a.discoveredAt?.seconds ?? 0));
+      onChange(papers);
+    },
+    (err) => {
+      console.error("subscribeToAllPapers error:", err);
+      onChange([]);
+    },
   );
-  return onSnapshot(q, (snap) => {
-    onChange(
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<PublicPaper, "id">),
-      })),
-    );
-  });
 }
 
 /** Subscribe to site content (synthesis, highlights, stats). */
@@ -100,6 +103,10 @@ export function subscribeToSiteContent(
     doc(firestore, "siteContent", "main"),
     (snap) => {
       onChange(snap.exists() ? (snap.data() as SiteContent) : null);
+    },
+    (err) => {
+      console.error("subscribeToSiteContent error:", err);
+      onChange(null);
     },
   );
 }
@@ -175,19 +182,21 @@ export function subscribeToDocuments(
   userId: string,
   onChange: (documents: ResearchDocument[]) => void,
 ): Unsubscribe {
-  const documentsQuery = query(
-    collection(firestore, "documents"),
-    where("userId", "==", userId),
-    orderBy("createdAt", "desc"),
+  const documentsQuery = collection(firestore, "documents");
+  return onSnapshot(
+    documentsQuery,
+    (snapshot) => {
+      const docs = snapshot.docs
+        .map((item) => ({ id: item.id, ...(item.data() as Omit<ResearchDocument, "id">) }))
+        .filter((d) => d.userId === userId)
+        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      onChange(docs);
+    },
+    (err) => {
+      console.error("subscribeToDocuments error:", err);
+      onChange([]);
+    },
   );
-  return onSnapshot(documentsQuery, (snapshot) => {
-    onChange(
-      snapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<ResearchDocument, "id">),
-      })),
-    );
-  });
 }
 
 export function subscribeToChat(
@@ -195,19 +204,21 @@ export function subscribeToChat(
   documentId: string,
   onChange: (messages: DocumentChatMessage[]) => void,
 ): Unsubscribe {
-  const messagesQuery = query(
-    collection(firestore, "documents", documentId, "messages"),
-    where("userId", "==", userId),
-    orderBy("createdAt", "asc"),
+  const messagesQuery = collection(firestore, "documents", documentId, "messages");
+  return onSnapshot(
+    messagesQuery,
+    (snapshot) => {
+      const msgs = snapshot.docs
+        .map((item) => ({ id: item.id, ...(item.data() as Omit<DocumentChatMessage, "id">) }))
+        .filter((m) => m.userId === userId)
+        .sort((a, b) => (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0));
+      onChange(msgs);
+    },
+    (err) => {
+      console.error("subscribeToChat error:", err);
+      onChange([]);
+    },
   );
-  return onSnapshot(messagesQuery, (snapshot) => {
-    onChange(
-      snapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<DocumentChatMessage, "id">),
-      })),
-    );
-  });
 }
 
 export async function createSymptomReport(
@@ -225,17 +236,19 @@ export function subscribeToSymptomReports(
   userId: string,
   onChange: (reports: SymptomReport[]) => void,
 ): Unsubscribe {
-  const reportsQuery = query(
-    collection(firestore, "symptomReports"),
-    where("userId", "==", userId),
-    orderBy("date", "desc"),
+  const reportsQuery = collection(firestore, "symptomReports");
+  return onSnapshot(
+    reportsQuery,
+    (snapshot) => {
+      const reports = snapshot.docs
+        .map((item) => ({ id: item.id, ...(item.data() as Omit<SymptomReport, "id">) }))
+        .filter((r) => r.userId === userId)
+        .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+      onChange(reports);
+    },
+    (err) => {
+      console.error("subscribeToSymptomReports error:", err);
+      onChange([]);
+    },
   );
-  return onSnapshot(reportsQuery, (snapshot) => {
-    onChange(
-      snapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<SymptomReport, "id">),
-      })),
-    );
-  });
 }
