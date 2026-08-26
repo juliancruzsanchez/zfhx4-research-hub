@@ -135,6 +135,7 @@ export default function Landing() {
           </a>
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
+            <a href="/auth" className="inline-flex rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]">Open workspace</a>
             <span className="flex items-center gap-1.5 rounded-full border border-[#dce7e3] bg-white px-3 py-1.5 text-[#37665d]">
               <span className="size-1.5 rounded-full bg-[#3b9a7f]" />
               Version 1
@@ -305,7 +306,7 @@ export default function Landing() {
             This library is an information resource, not medical advice. Research findings can change as new evidence becomes available. Always discuss papers and individual care with your clinical team.
           </p>
           <p className="mt-2 flex items-center gap-1.5">
-            Prepared for customers <span className="text-[#b1c0bb">·</span> Links open at their original source
+            Prepared for customers <span className="text-[#b1c0bb">·</span> <a href="/legal/medical" className="underline-offset-2 hover:underline">Medical information notice</a> <span className="text-[#b1c0bb">·</span> <a href="/legal/privacy" className="underline-offset-2 hover:underline">Privacy</a> <span className="text-[#b1c0bb">·</span> <a href="/legal/terms" className="underline-offset-2 hover:underline">Terms</a>
           </p>
         </footer>
       </section>

@@ -1,20 +1,33 @@
-import { api } from "@/convex/_generated/api";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  type User,
+} from "firebase/auth";
+import { useEffect, useState } from "react";
+
+import { firebaseAuth } from "@/lib/firebase";
 
 export function useAuth() {
-  const { isLoading: isAuthLoading, isAuthenticated } = useConvexAuth();
-  const user = useQuery(api.users.currentUser);
-  const { signIn, signOut } = useAuthActions();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Derive isLoading directly from the dependencies instead of managing separate state
-  const isLoading = isAuthLoading || user === undefined;
+  useEffect(() => {
+    return onAuthStateChanged(firebaseAuth, (nextUser) => {
+      setUser(nextUser);
+      setIsLoading(false);
+    });
+  }, []);
 
   return {
-    isLoading,
-    isAuthenticated,
     user,
-    signIn,
-    signOut,
+    isLoading,
+    isAuthenticated: Boolean(user),
+    signIn: (email: string, password: string) =>
+      signInWithEmailAndPassword(firebaseAuth, email, password),
+    signUp: (email: string, password: string) =>
+      createUserWithEmailAndPassword(firebaseAuth, email, password),
+    signOut: () => firebaseSignOut(firebaseAuth),
   };
 }
