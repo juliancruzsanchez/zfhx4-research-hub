@@ -40,6 +40,7 @@ export interface PublicPaper {
   openAccess: boolean;
   status: PaperStatus;
   pmid?: string;
+  doi?: string;
   discoveredAt?: { seconds: number; nanoseconds: number };
   approvedAt?: { seconds: number; nanoseconds: number };
   rejectedAt?: { seconds: number; nanoseconds: number };

@@ -3,15 +3,15 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { initializeApp } from "firebase-admin/app";
 
-import { searchPubMed, type PubMedSearchResult } from "./pubmed.js";
 import type { PaperData, SiteContentData } from "./types.js";
+import { discoverCandidates, extractAndSaveCandidates } from "./discovery.js";
 
 /* ─── Init ──────────────────────────────────────────────────────────────────── */
 
 initializeApp();
 const db = getFirestore();
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY ?? "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";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
@@ -112,33 +112,7 @@ export const chatAboutResearch = onCall(
   },
 );
 
-/* ─── refreshPapers: search PubMed + extract with Groq ──────────────────────── */
-
-const EXTRACT_PROMPT = `You are given a list of PubMed search results (title, authors, journal, year, abstract). For EACH paper, extract the following in JSON. Return ONLY a JSON array — no markdown, no explanation.
-
-For each paper return:
-{
-  "pmid": "the PubMed ID",
-  "title": "full paper title",
-  "authors": "formatted author string (e.g. Baca et al.)",
-  "journal": "journal name",
-  "year": "publication year",
-  "type": one of "Core study" | "Clinical context" | "Related biology" | "Review",
-  "summary": "2-3 sentence plain-language summary",
-  "keyFindings": ["finding 1", "finding 2", ...],
-  "tags": ["genetics", "neurodevelopment", ...],
-  "symptomsIdentified": ["developmental delay", "intellectual disability", ...],
-  "participants": "description of study population (e.g. '57 individuals') or 'Not specified'",
-  "openAccess": true/false
-}
-
-Classification guide:
-- "Core study": Original research on ZFHX4 loss of function (cohort studies, case series, functional experiments)
-- "Clinical context": Case reports or clinical descriptions of ZFHX4 variants
-- "Related biology": Research on ZFHX4 in model organisms or related pathways
-- "Review": Review articles summarizing existing ZFHX4 research
-
-Papers:`;
+/* ─── refreshPapers: search PubMed + medical journals, extract with Groq ─────── */
 
 export const refreshPapers = onCall(
   { memory: "512MiB", timeoutSeconds: 120 },
@@ -154,94 +128,23 @@ export const refreshPapers = onCall(
       }
     }
 
-    // 1. Search PubMed
-    const results = await searchPubMed("ZFHX4 loss of function", 30);
-    if (results.length === 0) {
-      return { skipped: true, message: "No PubMed results found." };
+    // 1. Discover candidates from PubMed + Crossref (medical journals)
+    const candidates = await discoverCandidates();
+    if (candidates.length === 0) {
+      return { skipped: true, message: "No new results found on PubMed or medical journals." };
     }
 
-    // 2. Check which PMIDs we already have
-    const existingSnap = await db.collection(PAPERS).select("pmid").get();
-    const existingPmids = new Set(
-      existingSnap.docs.map((d) => (d.data() as PaperData).pmid).filter(Boolean),
-    );
+    // 2. Extract with Groq + save pending
+    const { saved, skipped } = await extractAndSaveCandidates(candidates);
 
-    const newResults = results.filter((r) => !existingPmids.has(r.pmid));
-    if (newResults.length === 0) {
-      // Still update lastRefreshAt
-      await contentRef.set({ lastRefreshAt: Timestamp.now() }, { merge: true });
+    if (saved === 0) {
       return { skipped: false, newPapers: 0, message: "All papers already in database." };
     }
 
-    // 3. Extract structured data with Groq
-    const inputText = newResults
-      .map(
-        (r) =>
-          `PMID: ${r.pmid}\nTitle: ${r.title}\nAuthors: ${r.authors}\nJournal: ${r.journal}\nYear: ${r.year}\nAbstract: ${r.abstract}\nPMC: ${r.pmcLink || "N/A"}`,
-      )
-      .join("\n\n---\n\n");
-
-    const extraction = await callGroq(
-      [
-        { role: "system", content: "You are a biomedical research analyst. Return valid JSON only." },
-        { role: "user", content: `${EXTRACT_PROMPT}\n\n${inputText}` },
-      ],
-      0.2,
-      4096,
-    );
-
-    // Parse the Groq response — strip markdown fences if present
-    const cleaned = extraction.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    let extracted: Array<Record<string, unknown>>;
-    try {
-      extracted = JSON.parse(cleaned) as Array<Record<string, unknown>>;
-    } catch {
-      console.error("Failed to parse Groq extraction:", cleaned.slice(0, 500));
-      throw new HttpsError("internal", "Failed to parse AI extraction. Please try again.");
-    }
-
-    // 4. Save new papers as pending
-    const batch = db.batch();
-    const now = Timestamp.now();
-
-    for (const item of extracted) {
-      const pmid = String(item.pmid ?? "");
-      // Find the PubMed result for links
-      const pubmed = newResults.find((r) => r.pmid === pmid);
-
-      const paperData: PaperData = {
-        title: String(item.title ?? ""),
-        authors: String(item.authors ?? ""),
-        journal: String(item.journal ?? ""),
-        year: String(item.year ?? ""),
-        type: (item.type as PaperData["type"]) ?? "Core study",
-        summary: String(item.summary ?? ""),
-        keyFindings: Array.isArray(item.keyFindings) ? item.keyFindings.map(String) : [],
-        tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
-        symptomsIdentified: Array.isArray(item.symptomsIdentified) ? item.symptomsIdentified.map(String) : [],
-        participants: String(item.participants ?? "Not specified"),
-        link: pubmed?.pubmedLink ?? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-        pdfLink: pubmed?.pmcLink ?? "",
-        source: pubmed?.pmcLink ? "PMC" : "PubMed",
-        openAccess: Boolean(item.openAccess),
-        status: "pending",
-        pmid,
-        discoveredAt: now,
-      };
-
-      const ref = db.collection(PAPERS).doc();
-      batch.set(ref, paperData);
-    }
-
-    // Update lastRefreshAt
-    batch.set(contentRef, { lastRefreshAt: now }, { merge: true });
-
-    await batch.commit();
-
     return {
       skipped: false,
-      newPapers: extracted.length,
-      message: `Found ${extracted.length} new paper(s). They are pending your review.`,
+      newPapers: saved,
+      message: `Found ${saved} new paper(s) from PubMed and medical journals. They are pending your review.`,
     };
   },
 );
@@ -430,84 +333,14 @@ export const weeklyPaperRefresh = onSchedule(
       }
     }
 
-    // Search PubMed
-    const results = await searchPubMed("ZFHX4 loss of function", 30);
-    if (results.length === 0) {
-      console.log("No PubMed results.");
+    // Discover from PubMed + medical journals
+    const candidates = await discoverCandidates();
+    if (candidates.length === 0) {
+      console.log("No new candidates found.");
       return;
     }
 
-    const existingSnap = await db.collection(PAPERS).select("pmid").get();
-    const existingPmids = new Set(
-      existingSnap.docs.map((d) => (d.data() as PaperData).pmid).filter(Boolean),
-    );
-
-    const newResults = results.filter((r) => !existingPmids.has(r.pmid));
-    if (newResults.length === 0) {
-      await contentRef.set({ lastRefreshAt: Timestamp.now() }, { merge: true });
-      console.log("No new papers found.");
-      return;
-    }
-
-    const inputText = newResults
-      .map(
-        (r) =>
-          `PMID: ${r.pmid}\nTitle: ${r.title}\nAuthors: ${r.authors}\nJournal: ${r.journal}\nYear: ${r.year}\nAbstract: ${r.abstract}\nPMC: ${r.pmcLink || "N/A"}`,
-      )
-      .join("\n\n---\n\n");
-
-    const extraction = await callGroq(
-      [
-        { role: "system", content: "You are a biomedical research analyst. Return valid JSON only." },
-        { role: "user", content: `${EXTRACT_PROMPT}\n\n${inputText}` },
-      ],
-      0.2,
-      4096,
-    );
-
-    const cleaned = extraction.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    let extracted: Array<Record<string, unknown>>;
-    try {
-      extracted = JSON.parse(cleaned) as Array<Record<string, unknown>>;
-    } catch {
-      console.error("Failed to parse Groq extraction in scheduler:", cleaned.slice(0, 500));
-      return;
-    }
-
-    const batch = db.batch();
-    const now = Timestamp.now();
-
-    for (const item of extracted) {
-      const pmid = String(item.pmid ?? "");
-      const pubmed = newResults.find((r) => r.pmid === pmid);
-
-      const paperData: PaperData = {
-        title: String(item.title ?? ""),
-        authors: String(item.authors ?? ""),
-        journal: String(item.journal ?? ""),
-        year: String(item.year ?? ""),
-        type: (item.type as PaperData["type"]) ?? "Core study",
-        summary: String(item.summary ?? ""),
-        keyFindings: Array.isArray(item.keyFindings) ? item.keyFindings.map(String) : [],
-        tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
-        symptomsIdentified: Array.isArray(item.symptomsIdentified) ? item.symptomsIdentified.map(String) : [],
-        participants: String(item.participants ?? "Not specified"),
-        link: pubmed?.pubmedLink ?? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-        pdfLink: pubmed?.pmcLink ?? "",
-        source: pubmed?.pmcLink ? "PMC" : "PubMed",
-        openAccess: Boolean(item.openAccess),
-        status: "pending",
-        pmid,
-        discoveredAt: now,
-      };
-
-      const ref = db.collection(PAPERS).doc();
-      batch.set(ref, paperData);
-    }
-
-    batch.set(contentRef, { lastRefreshAt: now }, { merge: true });
-    await batch.commit();
-
-    console.log(`Weekly refresh: ${extracted.length} new papers saved as pending.`);
+    const { saved } = await extractAndSaveCandidates(candidates);
+    console.log(`Weekly refresh: ${saved} new paper(s) saved as pending.`);
   },
 );

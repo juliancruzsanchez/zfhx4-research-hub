@@ -6,7 +6,7 @@ export type PaperStatus = "pending" | "published" | "archived";
 
 export type PaperType = "Core study" | "Clinical context" | "Related biology" | "Review";
 
-export type PaperSource = "PubMed" | "PMC" | "medRxiv" | "Other";
+export type PaperSource = "PubMed" | "PMC" | "medRxiv" | "Crossref" | "Other";
 
 export interface PaperData {
   title: string;
@@ -25,6 +25,7 @@ export interface PaperData {
   openAccess: boolean;
   status: PaperStatus;
   pmid?: string;
+  doi?: string;
   discoveredAt: Timestamp;
   approvedAt?: Timestamp;
   rejectedAt?: Timestamp;
