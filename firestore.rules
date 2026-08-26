@@ -19,5 +19,17 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if owns(resource) && request.resource.data.userId == request.auth.uid;
     }
+
+    // Public research data — anyone can read published papers and site content
+    match /papers/{paperId} {
+      allow read: if true;
+      // Writes come from Cloud Functions (admin SDK), not client-side
+      allow create, update, delete: if false;
+    }
+
+    match /siteContent/{docId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
   }
 }
