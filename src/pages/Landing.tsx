@@ -136,10 +136,7 @@ export default function Landing() {
             >
               Open workspace
             </a>
-            <span className="flex items-center gap-1.5 rounded-full border border-[#dce7e3] bg-white px-3 py-1.5 text-[#37665d]">
-              <span className="size-1.5 rounded-full bg-[#3b9a7f]" />
-              Version 1
-            </span>
+
           </div>
         </div>
       </header>
