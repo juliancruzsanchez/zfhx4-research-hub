@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions"
+    "deploy": "firebase deploy --only functions",
+    "seed": "bun run src/seed.ts"
   },
   "engines": {
     "node": "20"
