@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { defineSecret } from "firebase-functions/params";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { initializeApp } from "firebase-admin/app";
 
@@ -11,7 +12,7 @@ import { discoverCandidates, extractAndSaveCandidates } from "./discovery.js";
 initializeApp();
 const db = getFirestore();
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
@@ -23,14 +24,15 @@ async function callGroq(
   temperature = 0.5,
   maxTokens = 1024,
 ): Promise<string> {
-  if (!GROQ_API_KEY) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
     throw new HttpsError("failed-precondition", "GROQ_API_KEY is not configured.");
   }
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${GROQ_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -65,7 +67,7 @@ const CHAT_SYSTEM = `You are a research assistant for a ZFHX4 Research Hub. Answ
 - Do not provide medical advice or diagnoses.`;
 
 export const chatAboutResearch = onCall(
-  { memory: "256MiB", timeoutSeconds: 30 },
+  { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
     const { message, history } = request.data as {
       message: string;
@@ -115,7 +117,7 @@ export const chatAboutResearch = onCall(
 /* ─── refreshPapers: search PubMed + medical journals, extract with Groq ─────── */
 
 export const refreshPapers = onCall(
-  { memory: "512MiB", timeoutSeconds: 120 },
+  { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
   async () => {
     // Check last refresh — skip if < 7 days old (unless called manually)
     const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
@@ -152,7 +154,7 @@ export const refreshPapers = onCall(
 /* ─── publishPaper ──────────────────────────────────────────────────────────── */
 
 export const publishPaper = onCall(
-  { memory: "256MiB", timeoutSeconds: 30 },
+  { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
     const { paperId } = request.data as { paperId: string };
     if (!paperId) throw new HttpsError("invalid-argument", "paperId is required.");
@@ -176,7 +178,7 @@ export const publishPaper = onCall(
 /* ─── archivePaper ──────────────────────────────────────────────────────────── */
 
 export const archivePaper = onCall(
-  { memory: "256MiB", timeoutSeconds: 30 },
+  { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
     const { paperId } = request.data as { paperId: string };
     if (!paperId) throw new HttpsError("invalid-argument", "paperId is required.");
@@ -303,7 +305,7 @@ async function runSynthesis(): Promise<void> {
 }
 
 export const synthesizeUnderstanding = onCall(
-  { memory: "512MiB", timeoutSeconds: 120 },
+  { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
   async () => {
     await runSynthesis();
     return { success: true };
@@ -318,6 +320,7 @@ export const weeklyPaperRefresh = onSchedule(
     timeZone: "America/New_York",
     memory: "512MiB",
     timeoutSeconds: 180,
+    secrets: [GROQ_API_KEY],
   },
   async () => {
     console.log("Starting weekly paper refresh...");

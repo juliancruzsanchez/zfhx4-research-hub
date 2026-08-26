@@ -9,8 +9,6 @@ const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
 export const EXTRACT_PROMPT = `You are given a list of research paper records (title, authors, journal, year, abstract, source). For EACH paper, extract the following in JSON. Return ONLY a JSON array — no markdown, no explanation.
 
 For each paper return:
@@ -231,14 +229,15 @@ async function callGroq(
   temperature: number,
   maxTokens: number,
 ): Promise<string> {
-  if (!GROQ_API_KEY) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
     throw new HttpsError("failed-precondition", "GROQ_API_KEY is not configured.");
   }
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${GROQ_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
