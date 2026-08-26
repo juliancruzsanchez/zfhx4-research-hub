@@ -11,109 +11,28 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { chatAboutResearch, synthesizeFindings, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
+import { chatAboutResearch, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
+import {
+  subscribeToPublishedPapers,
+  subscribeToSiteContent,
+  type PublicPaper,
+  type SiteContent,
+} from "@/lib/firebase-data";
 
-/* ─── Paper data ───────────────────────────────────────────────────────────── */
+/* ─── Icon map for highlights ───────────────────────────────────────────────── */
 
-interface Paper {
-  id: number;
-  title: string;
-  authors: string;
-  journal: string;
-  year: string;
-  type: "Core study" | "Clinical context" | "Related biology";
-  summary: string;
-  keyFindings: string[];
-  link: string;
-  source: "PubMed" | "PMC" | "medRxiv";
-  openAccess: boolean;
-}
-
-const papers: Paper[] = [
-  {
-    id: 1,
-    title:
-      "Loss of function of the zinc finger homeobox 4 gene, ZFHX4, underlies a neurodevelopmental disorder",
-    authors: "Baca et al.",
-    journal: "American Journal of Human Genetics",
-    year: "2025",
-    type: "Core study",
-    summary:
-      "A peer-reviewed study of 57 people with ZFHX4 protein-truncating variants or deletions. It describes shared developmental features and provides evidence that ZFHX4 loss of function is the underlying mechanism.",
-    keyFindings: [
-      "57 individuals with ZFHX4 loss-of-function variants studied",
-      "Identified a recognizable neurodevelopmental disorder",
-      "Shared features include developmental delay, intellectual disability, and characteristic facial features",
-      "Loss of function is the confirmed disease mechanism",
-    ],
-    link: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12256859/",
-    source: "PMC",
-    openAccess: true,
-  },
-  {
-    id: 2,
-    title:
-      "Loss-of-function of the Zinc Finger Homeobox 4 (ZFHX4) gene underlies a neurodevelopmental disorder",
-    authors: "Del Rocío et al.",
-    journal: "medRxiv preprint",
-    year: "2024",
-    type: "Core study",
-    summary:
-      "The openly available preprint reporting 57 individuals, including 52 probands and 5 affected family members. The final peer-reviewed version is listed above; this record is kept for transparency and early access.",
-    keyFindings: [
-      "52 probands and 5 affected family members identified",
-      "Confirms autosomal dominant inheritance pattern",
-      "Phenotype includes developmental delay and dysmorphic features",
-    ],
-    link: "https://www.medrxiv.org/content/10.1101/2024.08.07.24311381v1",
-    source: "medRxiv",
-    openAccess: true,
-  },
-  {
-    id: 3,
-    title:
-      "Role of ZFHX4 in orofacial clefting based on human genetic data and zebrafish models",
-    authors: "Ishorst et al.",
-    journal: "European Journal of Human Genetics",
-    year: "2025",
-    type: "Related biology",
-    summary:
-      "Combines human genetic data with zebrafish experiments to explore ZFHX4 in cleft lip and palate and cleft palate only. Helpful context for understanding the gene's role in craniofacial development.",
-    keyFindings: [
-      "ZFHX4 variants linked to cleft lip and palate",
-      "Zebrafish models confirm role in craniofacial development",
-      "Expands the phenotypic spectrum of ZFHX4-related conditions",
-    ],
-    link: "https://pmc.ncbi.nlm.nih.gov/articles/PMC7617551/",
-    source: "PMC",
-    openAccess: true,
-  },
-  {
-    id: 4,
-    title:
-      "A ZFHX4 mutation associated with a recognizable neuropsychological and facial phenotype",
-    authors: "Fontana et al.",
-    journal: "American Journal of Medical Genetics Part A",
-    year: "2021",
-    type: "Clinical context",
-    summary:
-      "Describes a person with a ZFHX4 variant and a recognizable pattern of neuropsychological and facial features, adding early clinical context to the later loss-of-function cohort work.",
-    keyFindings: [
-      "First individual case linking ZFHX4 to a recognizable phenotype",
-      "Identified consistent neuropsychological features",
-      "Provides early clinical evidence before the larger cohort study",
-    ],
-    link: "https://pubmed.ncbi.nlm.nih.gov/34461323/",
-    source: "PubMed",
-    openAccess: false,
-  },
-];
+const iconMap: Record<string, React.ReactNode> = {
+  users: <Users className="size-5" />,
+  dna: <Dna className="size-5" />,
+  search: <Search className="size-5" />,
+  file: <FileText className="size-5" />,
+};
 
 /* ─── Chat message type ────────────────────────────────────────────────────── */
 
@@ -126,12 +45,22 @@ interface ChatMessage {
 /* ─── Component ────────────────────────────────────────────────────────────── */
 
 export default function Landing() {
+  const [papers, setPapers] = useState<PublicPaper[]>([]);
+  const [siteContent, setSiteContent] = useState<SiteContent | null>(null);
   const [chatInput, setChatInput] = useState("");
-  const [synthesis, setSynthesis] = useState<string | null>(null);
-  const [isSynthesizing, setIsSynthesizing] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to Firestore data
+  useEffect(() => {
+    const unsubPapers = subscribeToPublishedPapers(setPapers);
+    const unsubContent = subscribeToSiteContent(setSiteContent);
+    return () => {
+      unsubPapers();
+      unsubContent();
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -140,15 +69,6 @@ export default function Landing() {
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages, scrollToBottom]);
-
-  useEffect(() => {
-    synthesizeFindings()
-      .then(setSynthesis)
-      .catch(() => {
-        setSynthesis(null);
-      })
-      .finally(() => setIsSynthesizing(false));
-  }, []);
 
   async function handleSend(text?: string) {
     const question = (text ?? chatInput).trim();
@@ -179,40 +99,16 @@ export default function Landing() {
     } catch (error) {
       console.error("Chat error:", error);
       toast.error("Could not get a response. Please try again.");
-      setChatMessages((prev) =>
-        prev.filter((m) => m.id !== userMsg.id),
-      );
+      setChatMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
       setIsTyping(false);
     }
   }
 
-  /* Unique findings across all papers */
-  const topFindings = useMemo(
-    () => [
-      {
-        stat: "57",
-        label: "people studied",
-        detail: "across the core cohort",
-      },
-      {
-        stat: "4",
-        label: "research papers",
-        detail: "2021 – 2025",
-      },
-      {
-        stat: "1",
-        label: "confirmed mechanism",
-        detail: "ZFHX4 loss of function",
-      },
-      {
-        stat: "Open",
-        label: "access available",
-        detail: "3 of 4 papers",
-      },
-    ],
-    [],
-  );
+  /* Derived data */
+  const highlights = siteContent?.highlights ?? [];
+  const stats = siteContent?.stats ?? [];
+  const synthesis = siteContent?.currentUnderstanding ?? null;
 
   return (
     <motion.main
@@ -248,7 +144,7 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* ─── Hero: lead with findings ────────────────────────────────────── */}
+      {/* ─── Hero: synthesis from Firestore ──────────────────────────────── */}
       <section className="border-b border-[#dce7e3] bg-[#edf5f2]">
         <div className="mx-auto max-w-[1240px] px-5 pb-10 pt-12 sm:px-8 sm:pb-14 sm:pt-16 lg:px-10 lg:pt-[76px]">
           <div className="max-w-3xl">
@@ -274,87 +170,91 @@ export default function Landing() {
               <span className="text-[#398b74]">neurodevelopmental disorder</span>
             </motion.h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.45 }}
-              className="mt-6 max-w-xl text-base leading-7 text-[#58706b] sm:text-[17px]"
-            >
-              A study of 57 individuals confirmed that protein-truncating variants and deletions
-              in ZFHX4 cause a recognizable pattern of developmental delay, intellectual disability,
-              and characteristic facial features — establishing a distinct clinical entity.
-            </motion.p>
+            {synthesis ? (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.45 }}
+                className="mt-6 max-w-xl space-y-3"
+              >
+                {synthesis
+                  .split("\n\n")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((paragraph, i) => (
+                    <p
+                      key={i}
+                      className="text-base leading-7 text-[#58706b] sm:text-[17px]"
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+              </motion.div>
+            ) : (
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.45 }}
+                className="mt-6 max-w-xl text-base leading-7 text-[#58706b] sm:text-[17px]"
+              >
+                Research about loss of function in ZFHX4, organized to help customers
+                and their care teams understand the evidence.
+              </motion.p>
+            )}
           </div>
 
-          {/* Stats strip */}
-          <div className="mt-10 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#d4e5df] bg-[#d4e5df] sm:mt-14 sm:grid-cols-4">
-            {topFindings.map((item) => (
-              <div key={item.label} className="bg-[#f8fbfa] px-4 py-4 sm:px-5 sm:py-5">
-                <p className="text-xl font-semibold tracking-[-0.03em] text-[#18322f] sm:text-2xl">
-                  {item.stat}
-                </p>
-                <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#718681]">
-                  {item.label}
-                </p>
-                <p className="mt-0.5 text-[11px] text-[#96ada6]">{item.detail}</p>
-              </div>
+          {/* Stats strip — from Firestore */}
+          {stats.length > 0 && (
+            <div className="mt-10 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#d4e5df] bg-[#d4e5df] sm:mt-14 sm:grid-cols-4">
+              {stats.map((item) => (
+                <div key={item.label} className="bg-[#f8fbfa] px-4 py-4 sm:px-5 sm:py-5">
+                  <p className="text-xl font-semibold tracking-[-0.03em] text-[#18322f] sm:text-2xl">
+                    {item.stat}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#718681]">
+                    {item.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#96ada6]">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Key findings — from Firestore highlights ────────────────────── */}
+      {highlights.length > 0 && (
+        <section className="mx-auto max-w-[1240px] px-5 py-9 sm:px-8 sm:py-12 lg:px-10">
+          <div className="mb-8">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.13em] text-[#6c827c]">
+              <span className="size-2 rounded-full bg-[#3b9a7f]" />
+              What the research shows
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
+              Key findings across the evidence
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {highlights.map((item) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.35 }}
+                className="rounded-2xl border border-[#dbe6e2] bg-white p-6"
+              >
+                <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[#edf5f2] text-[#398b74]">
+                  {iconMap[item.icon] ?? <FileText className="size-5" />}
+                </div>
+                <h3 className="text-base font-semibold text-[#18322f]">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#58706b]">{item.body}</p>
+              </motion.div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ─── Key findings ────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-[1240px] px-5 py-9 sm:px-8 sm:py-12 lg:px-10">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.13em] text-[#6c827c]">
-            <span className="size-2 rounded-full bg-[#3b9a7f]" />
-            What the research shows
-          </div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
-            Key findings across the evidence
-          </h2>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            {
-              icon: <Users className="size-5" />,
-              title: "Recognizable neurodevelopmental disorder",
-              body: "Fifty-seven individuals with ZFHX4 loss-of-function variants share a consistent pattern of developmental delay, intellectual disability, and dysmorphic facial features — establishing this as a distinct clinical entity.",
-            },
-            {
-              icon: <Dna className="size-5" />,
-              title: "Loss of function is the mechanism",
-              body: "Protein-truncating variants and gene deletions prevent ZFHX4 from performing its role as a transcription factor, disrupting the regulation of genes critical for neurodevelopment.",
-            },
-            {
-              icon: <Search className="size-5" />,
-              title: "Craniofacial development confirmed",
-              body: "Zebrafish experiments and human genetic data link ZFHX4 to cleft lip and palate, expanding the known phenotypic spectrum and confirming its role in facial development.",
-            },
-            {
-              icon: <FileText className="size-5" />,
-              title: "First identified in 2021",
-              body: "An initial case report described a recognizable neuropsychological and facial phenotype, providing early clinical evidence that preceded the larger cohort confirmation.",
-            },
-          ].map((item) => (
-            <motion.div
-              key={item.title}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.35 }}
-              className="rounded-2xl border border-[#dbe6e2] bg-white p-6"
-            >
-              <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[#edf5f2] text-[#398b74]">
-                {item.icon}
-              </div>
-              <h3 className="text-base font-semibold text-[#18322f]">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-[#58706b]">{item.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ─── Chat agent ──────────────────────────────────────────────────── */}
       <section className="border-y border-[#dce7e3] bg-[#edf5f2]">
@@ -374,37 +274,6 @@ export default function Landing() {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[#d4e5df] bg-white shadow-sm">
-              {/* Findings synthesis */}
-              <div className="border-b border-[#edf1ef] bg-[#f5f9f7] px-5 py-4 sm:px-6">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="mt-0.5 size-4 shrink-0 text-[#398b74]" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5d8a7a]">
-                      Key Findings
-                    </p>
-                    {isSynthesizing ? (
-                      <div className="mt-3 space-y-2">
-                        {[1, 2, 3].map((i) => (
-                          <div
-                            key={i}
-                            className="h-4 animate-pulse rounded bg-[#d4e5df]"
-                            style={{ width: `${85 - i * 10}%` }}
-                          />
-                        ))}
-                      </div>
-                    ) : synthesis ? (
-                      <div className="mt-3 whitespace-pre-line text-sm leading-6 text-[#3a5c53]">
-                        {synthesis}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-[#81958f]">
-                        Findings synthesis will appear here when the research assistant is available.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Messages */}
               <div className="flex min-h-[180px] max-h-[380px] flex-col gap-3 overflow-y-auto p-5 sm:min-h-[220px] sm:max-h-[420px] sm:p-6">
                 <AnimatePresence initial={false}>
@@ -473,7 +342,7 @@ export default function Landing() {
                 </Button>
               </form>
 
-              {/* Suggested follow-up questions */}
+              {/* Suggested questions */}
               <div className="flex flex-wrap gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5">
                 {(chatMessages.length === 0
                   ? [
@@ -505,7 +374,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ─── Studies ─────────────────────────────────────────────────────── */}
+      {/* ─── Studies — from Firestore papers ─────────────────────────────── */}
       <section className="mx-auto max-w-[1240px] px-5 py-9 sm:px-8 sm:py-12 lg:px-10">
         <div className="mb-8">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.13em] text-[#6c827c]">
@@ -516,9 +385,20 @@ export default function Landing() {
             Read the evidence
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#71837f]">
-            All four papers in chronological order. Open access where available.
+            {papers.length} published {papers.length === 1 ? "paper" : "papers"} in
+            chronological order. Open access where available.
           </p>
         </div>
+
+        {papers.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-16 text-center">
+            <BookOpen className="mx-auto size-6 text-[#9aada7]" />
+            <h3 className="mt-4 text-base font-semibold text-[#29443e]">No papers published yet</h3>
+            <p className="mt-1 text-sm text-[#71837f]">
+              Research papers will appear here once published by the editorial team.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-4">
           {papers.map((paper, index) => (
@@ -552,7 +432,6 @@ export default function Landing() {
                     {paper.summary}
                   </p>
 
-                  {/* Key findings */}
                   {paper.keyFindings.length > 0 && (
                     <div className="mt-4 rounded-xl bg-[#f5f8f7] p-4">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#648079]">
@@ -571,6 +450,19 @@ export default function Landing() {
                       </ul>
                     </div>
                   )}
+
+                  {paper.tags.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {paper.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-md bg-[#f4f7f6] px-2 py-0.5 text-[11px] font-medium text-[#72847f]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-3 border-t border-[#edf1ef] pt-5 lg:w-[142px] lg:flex-col lg:items-stretch lg:border-0 lg:pt-1">
@@ -583,10 +475,21 @@ export default function Landing() {
                       <ExternalLink className="size-4" />
                     </a>
                   </Button>
+                  {paper.pdfLink && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-10 flex-1 cursor-pointer gap-2 border-[#d5e2de] px-4 text-sm font-medium text-[#526965] hover:bg-[#f5f8f7] lg:w-full lg:flex-none"
+                    >
+                      <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer">
+                        PDF
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    </Button>
+                  )}
                   <span className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#8a9b96] lg:justify-start">
                     <FileText className="size-3.5" />
                     {paper.source}
-                    <ExternalLink className="size-3" />
                   </span>
                 </div>
               </div>

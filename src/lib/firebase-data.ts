@@ -18,6 +18,91 @@ import {
 
 import { firestore, firebaseStorage } from "@/lib/firebase";
 
+/* ─── Public research data ──────────────────────────────────────────────────── */
+
+export type PaperStatus = "pending" | "published" | "archived";
+
+export interface PublicPaper {
+  id: string;
+  title: string;
+  authors: string;
+  journal: string;
+  year: string;
+  type: string;
+  summary: string;
+  keyFindings: string[];
+  tags: string[];
+  symptomsIdentified: string[];
+  participants: string;
+  link: string;
+  pdfLink: string;
+  source: string;
+  openAccess: boolean;
+  status: PaperStatus;
+  pmid?: string;
+  discoveredAt?: { seconds: number; nanoseconds: number };
+  approvedAt?: { seconds: number; nanoseconds: number };
+  rejectedAt?: { seconds: number; nanoseconds: number };
+}
+
+export interface SiteContent {
+  currentUnderstanding: string;
+  highlights: Array<{ title: string; body: string; icon: string }>;
+  stats: Array<{ stat: string; label: string; detail: string }>;
+  lastSynthesizedAt?: { seconds: number; nanoseconds: number } | null;
+  lastRefreshAt?: { seconds: number; nanoseconds: number } | null;
+  publishedPaperCount: number;
+}
+
+/** Subscribe to all published papers for the homepage. */
+export function subscribeToPublishedPapers(
+  onChange: (papers: PublicPaper[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(firestore, "papers"),
+    where("status", "==", "published"),
+    orderBy("year", "desc"),
+  );
+  return onSnapshot(q, (snap) => {
+    onChange(
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<PublicPaper, "id">),
+      })),
+    );
+  });
+}
+
+/** Subscribe to all papers (for admin review). */
+export function subscribeToAllPapers(
+  onChange: (papers: PublicPaper[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(firestore, "papers"),
+    orderBy("discoveredAt", "desc"),
+  );
+  return onSnapshot(q, (snap) => {
+    onChange(
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<PublicPaper, "id">),
+      })),
+    );
+  });
+}
+
+/** Subscribe to site content (synthesis, highlights, stats). */
+export function subscribeToSiteContent(
+  onChange: (content: SiteContent | null) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(firestore, "siteContent", "main"),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as SiteContent) : null);
+    },
+  );
+}
+
 export type DocumentStatus = "uploading" | "processing" | "ready" | "error";
 
 export interface ResearchDocument {

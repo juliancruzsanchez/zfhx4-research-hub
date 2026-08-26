@@ -1,16 +1,17 @@
 import { motion } from "framer-motion";
-import { Activity, Bot, CheckCircle2, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Plus, Send, Sparkles, UploadCloud } from "lucide-react";
+import { Activity, Archive, Bot, BookOpen, CheckCircle2, ExternalLink, FileText, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Plus, RefreshCcw, Send, Sparkles, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
-import { chatWithDocument } from "@/lib/firebase-functions";
-import { createDocument, createSymptomReport, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, type DocumentChatMessage, type ResearchDocument, type SymptomReport } from "@/lib/firebase-data";
+import { archivePaper, chatWithDocument, publishPaper, refreshPapers, synthesizeUnderstanding } from "@/lib/firebase-functions";
+import { createDocument, createSymptomReport, subscribeToAllPapers, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, type DocumentChatMessage, type PublicPaper, type ResearchDocument, type SymptomReport } from "@/lib/firebase-data";
 
 function formatDate(value?: { seconds: number }) {
   if (!value) return "Processing now";
@@ -28,7 +29,10 @@ export default function Workspace() {
   const [isAsking, setIsAsking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [researchConsent, setResearchConsent] = useState(false);
-  const [activeView, setActiveView] = useState<"documents" | "experiences">("documents");
+  const [activeView, setActiveView] = useState<"documents" | "experiences" | "papers">("documents");
+  const [allPapers, setAllPapers] = useState<PublicPaper[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [paperActionId, setPaperActionId] = useState<string | null>(null);
   const [reportForm, setReportForm] = useState({ date: new Date().toISOString().slice(0, 10), symptoms: "", impact: "", notes: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +55,11 @@ export default function Workspace() {
   useEffect(() => {
     if (!user) return;
     return subscribeToSymptomReports(user.uid, setReports);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToAllPapers(setAllPapers);
   }, [user]);
 
   const selectedDocument = useMemo(() => documents.find((document) => document.id === selectedDocumentId) ?? null, [documents, selectedDocumentId]);
@@ -109,6 +118,58 @@ export default function Workspace() {
     }
   }
 
+  async function handleRefreshPapers() {
+    setIsRefreshing(true);
+    try {
+      const result = await refreshPapers();
+      toast.success(result.message);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to refresh papers.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  async function handlePublishPaper(paperId: string) {
+    setPaperActionId(paperId);
+    try {
+      await publishPaper(paperId);
+      toast.success("Paper published. Synthesis updated.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to publish paper.");
+    } finally {
+      setPaperActionId(null);
+    }
+  }
+
+  async function handleArchivePaper(paperId: string) {
+    setPaperActionId(paperId);
+    try {
+      await archivePaper(paperId);
+      toast.success("Paper archived.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to archive paper.");
+    } finally {
+      setPaperActionId(null);
+    }
+  }
+
+  async function handleSynthesize() {
+    setIsRefreshing(true);
+    try {
+      await synthesizeUnderstanding();
+      toast.success("Synthesis updated.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to synthesize.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
   async function handleSignOut() {
     await signOut();
     navigate("/");
@@ -137,6 +198,7 @@ export default function Workspace() {
           </div>
           <Button variant="ghost" onClick={() => setActiveView("documents")} className={activeView === "documents" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileUp className="size-4" /> Medical records</Button>
           <Button variant="ghost" onClick={() => setActiveView("experiences")} className={activeView === "experiences" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Activity className="size-4" /> My experiences</Button>
+          <Button variant="ghost" onClick={() => setActiveView("papers")} className={activeView === "papers" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileText className="size-4" /> Research papers {allPapers.filter((p) => p.status === "pending").length > 0 && <Badge className="ml-auto bg-[#398b74] text-white">{allPapers.filter((p) => p.status === "pending").length}</Badge>}</Button>
           <div className="mt-8 border-t border-[#dce7e3] px-1 pt-5 text-xs leading-5 text-[#82938e]">Uploaded records stay associated with your account. Do not upload anything you do not have permission to share.</div>
         </aside>
 
@@ -182,10 +244,138 @@ export default function Workspace() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl space-y-6">
+            <div className="max-w-4xl space-y-6">
               <div><p className="text-sm text-[#6d837c]">Private notes for your care conversations</p><h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">My experiences</h2><p className="mt-3 text-sm leading-6 text-[#71837f]">Record symptoms, changes, and day-to-day experiences in your own words. This is not a diagnostic tool.</p></div>
               <form onSubmit={handleReportSubmit} className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6"><div className="grid gap-4 sm:grid-cols-[180px_1fr]"><label className="text-sm font-medium text-[#4d6860]">Date<input type="date" value={reportForm.date} onChange={(event) => setReportForm({ ...reportForm, date: event.target.value })} className="mt-2 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-sm" required /></label><label className="text-sm font-medium text-[#4d6860]">What did you notice?<Textarea value={reportForm.symptoms} onChange={(event) => setReportForm({ ...reportForm, symptoms: event.target.value })} placeholder="Describe symptoms or experiences in your own words" className="mt-2 min-h-24 border-[#d5e2de]" required /></label></div><label className="block text-sm font-medium text-[#4d6860]">How did it affect your day?<Textarea value={reportForm.impact} onChange={(event) => setReportForm({ ...reportForm, impact: event.target.value })} placeholder="Optional" className="mt-2 border-[#d5e2de]" /></label><label className="block text-sm font-medium text-[#4d6860]">Additional context<Textarea value={reportForm.notes} onChange={(event) => setReportForm({ ...reportForm, notes: event.target.value })} placeholder="Appointments, questions, or other context" className="mt-2 border-[#d5e2de]" /></label><Button type="submit" className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]"><Plus className="size-4" /> Save experience</Button></form>
               <div className="space-y-3">{reports.length === 0 && <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-5 py-10 text-center text-sm text-[#82938e]">Your saved experiences will appear here.</div>}{reports.map((report) => <article key={report.id} className="rounded-2xl border border-[#dbe6e2] bg-white p-5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#6f8981]">{report.date}</span><CheckCircle2 className="size-4 text-[#398b74]" /></div><p className="mt-3 text-sm leading-6 text-[#38574e]">{report.symptoms}</p>{report.impact && <p className="mt-3 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Impact:</span> {report.impact}</p>}{report.notes && <p className="mt-2 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Context:</span> {report.notes}</p>}</article>)}</div>
+            </div>
+          ) : (
+            /* ─── Research papers management ───────────────────────────── */
+            <div className="max-w-4xl space-y-6">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm text-[#6d837c]">Manage published research</p>
+                  <h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">Research papers</h2>
+                  <p className="mt-3 text-sm leading-6 text-[#71837f]">
+                    Papers are discovered weekly from PubMed and saved for your review. Publish the ones you want on the public site.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleRefreshPapers} disabled={isRefreshing} variant="outline" className="cursor-pointer gap-2 border-[#d5e2de]">
+                    {isRefreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />} Refresh from PubMed
+                  </Button>
+                  <Button onClick={handleSynthesize} disabled={isRefreshing} variant="outline" className="cursor-pointer gap-2 border-[#d5e2de]">
+                    {isRefreshing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Re-synthesize
+                  </Button>
+                </div>
+              </div>
+
+              {allPapers.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-6 py-16 text-center">
+                  <BookOpen className="mx-auto size-6 text-[#9aada7]" />
+                  <h3 className="mt-4 text-base font-semibold text-[#29443e]">No papers yet</h3>
+                  <p className="mt-1 text-sm text-[#71837f]">Click "Refresh from PubMed" to search for ZFHX4 papers.</p>
+                </div>
+              )}
+
+              {/* Pending papers */}
+              {allPapers.filter((p) => p.status === "pending").length > 0 && (
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[#b07a3a]">Pending review ({allPapers.filter((p) => p.status === "pending").length})</h3>
+                  <div className="space-y-3">
+                    {allPapers.filter((p) => p.status === "pending").map((paper) => (
+                      <article key={paper.id} className="rounded-2xl border border-[#e8d5a3] bg-[#fefcf6] p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <Badge className="border-0 bg-[#e7f4ef] px-2 py-0.5 text-[11px] font-semibold text-[#317762]">{paper.type}</Badge>
+                              <span className="text-[11px] text-[#96ada6]">{paper.year}</span>
+                              {paper.openAccess && <span className="text-[11px] text-[#78918a]">Open access</span>}
+                            </div>
+                            <h4 className="text-base font-semibold text-[#18322f]">{paper.title}</h4>
+                            <p className="mt-1 text-sm text-[#71837f]">{paper.authors} · {paper.journal}</p>
+                            <p className="mt-2 text-sm leading-6 text-[#526965]">{paper.summary}</p>
+                            {paper.keyFindings.length > 0 && (
+                              <div className="mt-3 rounded-xl bg-white p-3">
+                                <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#648079]">Key findings</p>
+                                <ul className="space-y-1">
+                                  {paper.keyFindings.map((f) => (
+                                    <li key={f} className="flex items-start gap-2 text-xs leading-5 text-[#3b5c54]">
+                                      <span className="mt-0.5 text-[#398b74]">•</span> {f}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {paper.tags.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {paper.tags.map((tag) => (
+                                  <span key={tag} className="rounded bg-[#f4f7f6] px-1.5 py-0.5 text-[10px] font-medium text-[#72847f]">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 gap-2 sm:flex-col">
+                            <Button onClick={() => handlePublishPaper(paper.id)} disabled={paperActionId === paper.id} className="h-9 cursor-pointer gap-1.5 bg-[#398b74] text-xs text-white hover:bg-[#2d755f]">
+                              {paperActionId === paper.id ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />} Publish
+                            </Button>
+                            <Button onClick={() => handleArchivePaper(paper.id)} disabled={paperActionId === paper.id} variant="outline" className="h-9 cursor-pointer gap-1.5 border-[#d5e2de] text-xs text-[#8a6d5a]">
+                              {paperActionId === paper.id ? <Loader2 className="size-3 animate-spin" /> : <Archive className="size-3" />} Archive
+                            </Button>
+                            <a href={paper.link} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#d5e2de] px-3 text-xs font-medium text-[#526965] hover:bg-[#f5f8f7]">
+                              <ExternalLink className="size-3" /> View
+                            </a>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Published papers */}
+              {allPapers.filter((p) => p.status === "published").length > 0 && (
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[#397768]">Published ({allPapers.filter((p) => p.status === "published").length})</h3>
+                  <div className="space-y-2">
+                    {allPapers.filter((p) => p.status === "published").map((paper) => (
+                      <div key={paper.id} className="flex items-center justify-between rounded-xl border border-[#d4e5df] bg-white px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[#29483f]">{paper.title}</p>
+                          <p className="mt-0.5 text-xs text-[#80928c]">{paper.authors} · {paper.journal} · {paper.year}</p>
+                        </div>
+                        <div className="ml-3 flex shrink-0 gap-2">
+                          <Button onClick={() => handleArchivePaper(paper.id)} disabled={paperActionId === paper.id} variant="ghost" size="sm" className="cursor-pointer text-xs text-[#8a6d5a]">
+                            <Archive className="size-3" /> Unpublish
+                          </Button>
+                          <a href={paper.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-[#526965] hover:underline">
+                            <ExternalLink className="size-3" />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Archived papers */}
+              {allPapers.filter((p) => p.status === "archived").length > 0 && (
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[#999]">Archived ({allPapers.filter((p) => p.status === "archived").length})</h3>
+                  <div className="space-y-2">
+                    {allPapers.filter((p) => p.status === "archived").map((paper) => (
+                      <div key={paper.id} className="flex items-center justify-between rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-4 py-3 opacity-60">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-[#666]">{paper.title}</p>
+                        </div>
+                        <Button onClick={() => handlePublishPaper(paper.id)} disabled={paperActionId === paper.id} variant="ghost" size="sm" className="cursor-pointer text-xs text-[#397768]">
+                          <CheckCircle2 className="size-3" /> Restore
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>

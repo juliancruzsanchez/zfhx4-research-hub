@@ -59,3 +59,41 @@ export async function synthesizeFindings(): Promise<string> {
   const result = await callable({});
   return result.data.content;
 }
+
+/* ─── Paper management ──────────────────────────────────────────────────────── */
+
+export async function refreshPapers(): Promise<{ newPapers: number; message: string; skipped: boolean }> {
+  const callable = httpsCallable<
+    Record<string, never>,
+    { newPapers: number; message: string; skipped: boolean }
+  >(firebaseFunctions, "refreshPapers");
+  const result = await callable({});
+  return result.data;
+}
+
+export async function publishPaper(paperId: string): Promise<{ success: boolean }> {
+  const callable = httpsCallable<
+    { paperId: string },
+    { success: boolean }
+  >(firebaseFunctions, "publishPaper");
+  const result = await callable({ paperId });
+  return result.data;
+}
+
+export async function archivePaper(paperId: string): Promise<{ success: boolean }> {
+  const callable = httpsCallable<
+    { paperId: string },
+    { success: boolean }
+  >(firebaseFunctions, "archivePaper");
+  const result = await callable({ paperId });
+  return result.data;
+}
+
+export async function synthesizeUnderstanding(): Promise<{ success: boolean }> {
+  const callable = httpsCallable<
+    Record<string, never>,
+    { success: boolean }
+  >(firebaseFunctions, "synthesizeUnderstanding");
+  const result = await callable({});
+  return result.data;
+}
