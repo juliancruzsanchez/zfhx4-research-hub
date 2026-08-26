@@ -11,7 +11,7 @@ import type { PaperData, SiteContentData } from "./types.js";
 initializeApp();
 const db = getFirestore();
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY ?? "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";
 const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
