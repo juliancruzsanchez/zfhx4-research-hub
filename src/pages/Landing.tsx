@@ -12,10 +12,12 @@ import {
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { chatAboutResearch, synthesizeFindings, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
 
 /* ─── Paper data ───────────────────────────────────────────────────────────── */
 
@@ -113,75 +115,6 @@ const papers: Paper[] = [
   },
 ];
 
-/* ─── Chat knowledge base ──────────────────────────────────────────────────── */
-
-const knowledgeBase: { patterns: RegExp[]; answer: string }[] = [
-  {
-    patterns: [/what\s+(is|does)\s+ZFHX4/i, /tell\s+me\s+about\s+ZFHX4/i, /about\s+ZFHX4/i],
-    answer:
-      "ZFHX4 (Zinc Finger Homeobox 4) is a gene that provides instructions for making a protein that acts as a transcription factor — it helps control the activity of other genes. Research has identified it as critical for neurodevelopment and craniofacial development. Loss-of-function variants in this gene cause a recognizable neurodevelopmental disorder.",
-  },
-  {
-    patterns: [/what\s+(was|is)\s+found/i, /main\s+(finding|result|conclusion)/i, /key\s+(finding|result|takeaway)/i, /summary/i, /what.*learn/i, /what.*discover/i],
-    answer:
-      "The core finding across the research is that loss of function of ZFHX4 causes a neurodevelopmental disorder. In the largest study (Baca et al., 2025), 57 people with ZFHX4 variants were studied and found to share developmental delay, intellectual disability, and characteristic facial features. Additional research linked ZFHX4 to craniofacial development, including cleft lip and palate, confirmed through zebrafish experiments.",
-  },
-  {
-    patterns: [/how\s+many\s+(people|individuals|patients|subjects|participants)/i, /sample\s+size/i, /cohort/i, /how\s+large/i],
-    answer:
-      "The largest cohort study (Baca et al., 2025) included 57 individuals — 52 probands (the first person in a family identified with the condition) and 5 affected family members. This study confirmed the autosomal dominant inheritance pattern, meaning a single copy of the altered gene is sufficient to cause the disorder.",
-  },
-  {
-    patterns: [/symptom|feature|sign|phenotype|presentation|characteristic/i, /what\s+does\s+it\s+(look|present)/i, /clinical/i],
-    answer:
-      "The ZFHX4-related neurodevelopmental disorder presents with a recognizable pattern of features including: developmental delay, intellectual disability (ranging from mild to moderate), characteristic facial features (described as a recognizable dysmorphic pattern), and possible craniofacial features such as cleft lip or palate. The phenotype is consistent enough across affected individuals to be considered a distinct clinical entity.",
-  },
-  {
-    patterns: [/inherit|genetic|autosomal|dominant|recessive|passed/i, /how\s+(is\s+it|does\s+it)\s+(inherited|passed|spread)/i],
-    answer:
-      "ZFHX4-related conditions follow an autosomal dominant inheritance pattern. This means that a single copy of the altered gene (from one parent) is enough to cause the disorder. In the cohort study, 5 affected family members were identified, confirming that the condition can be inherited within families. However, many cases appear to arise as new (de novo) mutations, meaning the variant is not inherited from a parent.",
-  },
-  {
-    patterns: [/craniofacial|cleft|facial|face/i, /orofacial/i],
-    answer:
-      "Research by Ishorst et al. (2025) specifically explored ZFHX4's role in craniofacial development. Using both human genetic data and zebrafish models, they found that ZFHX4 variants are associated with cleft lip and palate, as well as cleft palate only. The zebrafish experiments confirmed that ZFHX4 plays a direct role in craniofacial development, expanding the known phenotypic spectrum of ZFHX4-related conditions.",
-  },
-  {
-    patterns: [/zebrafish|animal\s+model|model\s+organism/i],
-    answer:
-      "Ishorst et al. (2025) used zebrafish as a model organism to study ZFHX4's function. Zebrafish are commonly used in developmental biology because their embryos are transparent and develop quickly. The zebrafish experiments confirmed that disrupting the ZFHX4 gene leads to craniofacial abnormalities, supporting the human genetic evidence that ZFHX4 is critical for proper facial development.",
-  },
-  {
-    patterns: [/treatment|therapy|cure|intervention|manage/i, /is\s+there\s+(a\s+)?cure/i, /can\s+it\s+be\s+treated/i],
-    answer:
-      "Currently, there is no specific cure for ZFHX4-related neurodevelopmental disorders. Treatment focuses on managing symptoms and supporting developmental needs — this may include speech therapy, occupational therapy, educational support, and monitoring for associated features like cleft lip or palate (which can be surgically corrected). Research is ongoing to better understand the condition and develop targeted interventions.",
-  },
-  {
-    patterns: [/when|date|year|timeline|latest|newest|recent/i, /what\s+year/i],
-    answer:
-      "The research timeline spans from 2021 to 2025: Fontana et al. (2021) published the first case report linking ZFHX4 to a recognizable phenotype. Del Rocío et al. (2024) released the preprint describing the 57-person cohort. Baca et al. (2025) published the peer-reviewed version confirming ZFHX4 loss-of-function as the disease mechanism. Also in 2025, Ishorst et al. demonstrated ZFHX4's role in craniofacial development through zebrafish models.",
-  },
-  {
-    patterns: [/open\s+access|free|pdf|read|available/i, /can\s+i\s+read/i, /where\s+can\s+i/i],
-    answer:
-      "Three of the four papers are open access and freely available: Baca et al. (2025) on PMC, the Del Rocío et al. (2024) preprint on medRxiv, and Ishorst et al. (2025) on PMC. The Fontana et al. (2021) paper on PubMed may require institutional access. You'll find direct links to all papers in the Studies section below.",
-  },
-  {
-    patterns: [/loss\s+of\s+function|mechanism|pathogenic|variant|mutation/i, /what\s+(causes|is\s+the\s+cause)/i],
-    answer:
-      "The disorder is caused by loss-of-function variants in the ZFHX4 gene. These include protein-truncating variants (mutations that create a premature stop codon, producing a shortened, nonfunctional protein) and deletions of part or all of the gene. When ZFHX4 function is lost, the transcription factor can no longer properly regulate its target genes during development, leading to the neurodevelopmental and craniofacial features observed in affected individuals.",
-  },
-];
-
-function findAnswer(question: string): string {
-  for (const entry of knowledgeBase) {
-    if (entry.patterns.some((p) => p.test(question))) {
-      return entry.answer;
-    }
-  }
-  return "That's a great question. While I don't have a specific answer for that in my current knowledge base, I'd recommend reviewing the original studies linked below for more details. You can also try asking about ZFHX4, the research findings, symptoms, inheritance patterns, or the studies themselves.";
-}
-
 /* ─── Chat message type ────────────────────────────────────────────────────── */
 
 interface ChatMessage {
@@ -194,14 +127,9 @@ interface ChatMessage {
 
 export default function Landing() {
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Welcome! I'm a research assistant for ZFHX4. Ask me about the findings, symptoms, genetics, or any of the studies — and I'll point you to the evidence.",
-    },
-  ]);
+  const [synthesis, setSynthesis] = useState<string | null>(null);
+  const [isSynthesizing, setIsSynthesizing] = useState(true);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -213,10 +141,18 @@ export default function Landing() {
     scrollToBottom();
   }, [chatMessages, scrollToBottom]);
 
-  function handleSend(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const question = chatInput.trim();
-    if (!question) return;
+  useEffect(() => {
+    synthesizeFindings()
+      .then(setSynthesis)
+      .catch(() => {
+        setSynthesis(null);
+      })
+      .finally(() => setIsSynthesizing(false));
+  }, []);
+
+  async function handleSend(text?: string) {
+    const question = (text ?? chatInput).trim();
+    if (!question || isTyping) return;
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -227,16 +163,28 @@ export default function Landing() {
     setChatInput("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      const answer = findAnswer(question);
+    try {
+      const apiHistory: ApiChatMessage[] = chatMessages
+        .slice(-6)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const { answer } = await chatAboutResearch(question, apiHistory);
+
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
         content: answer,
       };
       setChatMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error("Could not get a response. Please try again.");
+      setChatMessages((prev) =>
+        prev.filter((m) => m.id !== userMsg.id),
+      );
+    } finally {
       setIsTyping(false);
-    }, 600 + Math.random() * 800);
+    }
   }
 
   /* Unique findings across all papers */
@@ -426,8 +374,39 @@ export default function Landing() {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[#d4e5df] bg-white shadow-sm">
+              {/* Findings synthesis */}
+              <div className="border-b border-[#edf1ef] bg-[#f5f9f7] px-5 py-4 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-[#398b74]" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5d8a7a]">
+                      Key Findings
+                    </p>
+                    {isSynthesizing ? (
+                      <div className="mt-3 space-y-2">
+                        {[1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="h-4 animate-pulse rounded bg-[#d4e5df]"
+                            style={{ width: `${85 - i * 10}%` }}
+                          />
+                        ))}
+                      </div>
+                    ) : synthesis ? (
+                      <div className="mt-3 whitespace-pre-line text-sm leading-6 text-[#3a5c53]">
+                        {synthesis}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-[#81958f]">
+                        Findings synthesis will appear here when the research assistant is available.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Messages */}
-              <div className="flex h-[380px] flex-col gap-3 overflow-y-auto p-5 sm:h-[420px] sm:p-6">
+              <div className="flex min-h-[180px] max-h-[380px] flex-col gap-3 overflow-y-auto p-5 sm:min-h-[220px] sm:max-h-[420px] sm:p-6">
                 <AnimatePresence initial={false}>
                   {chatMessages.map((msg) => (
                     <motion.div
@@ -491,28 +470,33 @@ export default function Landing() {
                 </Button>
               </form>
 
-              {/* Suggested questions */}
-              {chatMessages.length <= 1 && (
-                <div className="flex flex-wrap gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5">
-                  {[
-                    "What was found in the studies?",
-                    "How many people were studied?",
-                    "Is this inherited?",
-                    "What are the symptoms?",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        setChatInput(q);
-                      }}
-                      className="cursor-pointer rounded-full border border-[#d5e2de] bg-white px-3 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:border-[#9ec8bb] hover:bg-[#f2f8f5]"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Suggested follow-up questions */}
+              <div className="flex flex-wrap gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5">
+                {(chatMessages.length === 0
+                  ? [
+                      "What developmental features are associated with ZFHX4 loss of function?",
+                      "How was the ZFHX4 connection discovered?",
+                      "What do zebrafish studies tell us?",
+                      "Is this condition inherited?",
+                    ]
+                  : [
+                      "What are the main symptoms?",
+                      "How is this diagnosed?",
+                      "Are there treatment options?",
+                      "What research is ongoing?",
+                    ]
+                ).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    disabled={isTyping}
+                    onClick={() => handleSend(q)}
+                    className="cursor-pointer rounded-full border border-[#d5e2de] bg-white px-3 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:border-[#9ec8bb] hover:bg-[#f2f8f5] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
