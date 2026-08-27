@@ -10,10 +10,6 @@ const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
 const CACHE_DAYS = 3;
 
-function isFresh(timestamp?: Timestamp): boolean {
-  return Boolean(timestamp && Date.now() - timestamp.toMillis() < CACHE_DAYS * 24 * 60 * 60 * 1000);
-}
-
 export const EXTRACT_PROMPT = `You are given a list of research paper records (title, authors, journal, year, abstract, source). For EACH paper, extract the following in JSON. Return ONLY a JSON array — no markdown, no explanation.
 
 For each paper return:

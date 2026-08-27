@@ -4,7 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { initializeApp } from "firebase-admin/app";
 
-import type { PaperData, SiteContentData } from "./types.js";
+import type { PaperData } from "./types.js";
 import { discoverCandidates, extractAndSaveCandidates } from "./discovery.js";
 
 /* ─── Init ──────────────────────────────────────────────────────────────────── */
@@ -18,11 +18,6 @@ const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean);
 const CACHE_DAYS = 3;
-const CACHE_MS = CACHE_DAYS * 24 * 60 * 60 * 1000;
-
-function isFresh(timestamp?: Timestamp): boolean {
-  return Boolean(timestamp && Date.now() - timestamp.toMillis() < CACHE_MS);
-}
 
 /* ─── Groq helper ───────────────────────────────────────────────────────────── */
 
@@ -316,18 +311,11 @@ async function runAllSyntheses(): Promise<void> {
     ),
   );
 
-  // Update shared / legacy fields from layman mode (default)
-  const totalParticipants = papers.reduce((sum, p) => {
-    const match = p.participants.match(/(\d+)/);
-    return sum + (match ? parseInt(match[1], 10) : 0);
-  }, 0);
-
-  const yearRange = papers
-    .map((p) => parseInt(p.year, 10))
-    .filter((y) => !isNaN(y));
-  const minYear = yearRange.length > 0 ? Math.min(...yearRange) : 2021;
-  const maxYear = yearRange.length > 0 ? Math.max(...yearRange) : 2025;
-
+  // Update shared / legacy fields from layman mode (default).
+  // The per-mode syntheses above already write the mode-specific
+  // currentUnderstanding_/highlights_/stats_ keys; this block keeps
+  // the homepage's "last synthesized" timestamp and paper count in
+  // sync.
   const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
   await contentRef.set(
     {
