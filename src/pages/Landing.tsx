@@ -161,16 +161,16 @@ export default function Landing() {
         {/* Row 2: reading level toggles — full width on mobile, inline on desktop */}
         <div className="border-t border-[#edf1ef] sm:border-t-0">
           <div className="mx-auto flex max-w-[1240px] items-center px-5 py-2 sm:justify-end sm:px-8 sm:py-0 lg:px-10">
-            <div className="flex w-full items-center justify-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:w-auto sm:justify-start" aria-label="Site reading level">
+            <div className="grid w-full grid-cols-3 items-stretch gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:w-auto sm:min-w-[330px]" aria-label="Site reading level">
               {(["layman", "clinical", "scientist"] as const).map((level) => (
                 <button
                   key={level}
                   type="button"
                   onClick={() => setReadingLevel(level)}
-                  className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"}
+                  className={readingLevel === level ? "w-full rounded-md bg-[#18322f] px-2.5 py-2 text-[11px] font-semibold text-white" : "w-full rounded-md px-2.5 py-2 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"}
                   aria-pressed={readingLevel === level}
                 >
-                  {readingLevelLabels[level]}
+                  {level === "layman" ? "Simple" : level === "clinical" ? "Clinical" : "Deep dive"}
                 </button>
               ))}
             </div>
