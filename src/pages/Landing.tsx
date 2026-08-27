@@ -5,6 +5,7 @@ import {
   Dna,
   ExternalLink,
   FileText,
+  LogIn,
   MessageCircle,
   Search,
   Send,
@@ -158,9 +159,10 @@ export default function Landing() {
             </div>
             <a
               href="/auth"
-              className="inline-flex rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
+              className="inline-flex size-9 items-center justify-center rounded-lg bg-[#18322f] px-2 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45] sm:h-auto sm:w-auto sm:px-3"
             >
-              Open workspace
+              <LogIn className="size-4 sm:hidden" />
+              <span className="hidden sm:inline">Log in</span>
             </a>
 
           </div>
