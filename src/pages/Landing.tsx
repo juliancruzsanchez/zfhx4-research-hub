@@ -52,6 +52,7 @@ export default function Landing() {
   const [isTyping, setIsTyping] = useState(false);
   const [studySearch, setStudySearch] = useState("");
   const [studyCategory, setStudyCategory] = useState("All studies");
+  const [readingLevel, setReadingLevel] = useState<"layperson" | "clinical" | "scientific">("layperson");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to Firestore data
@@ -90,7 +91,12 @@ export default function Landing() {
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const { answer } = await chatAboutResearch(question, apiHistory);
+      const levelPrompt = {
+        layperson: "Answer for a layperson using plain language and briefly define unavoidable medical terms.",
+        clinical: "Answer for a doctor or clinician using precise clinical terminology, while staying concise.",
+        scientific: "Answer for a scientist using technical molecular and genetic terminology and clearly distinguish evidence strength.",
+      }[readingLevel];
+      const { answer } = await chatAboutResearch(`${levelPrompt}\n\nQuestion: ${question}`, apiHistory);
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -139,6 +145,19 @@ export default function Landing() {
           </a>
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
+            <div className="hidden items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:flex" aria-label="Reading level">
+              {(["layperson", "clinical", "scientific"] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setReadingLevel(level)}
+                  className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"}
+                  aria-pressed={readingLevel === level}
+                >
+                  {level === "layperson" ? "Layperson" : level === "clinical" ? "Doctor" : "Scientist"}
+                </button>
+              ))}
+            </div>
             <a
               href="/auth"
               className="inline-flex rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
@@ -273,8 +292,13 @@ export default function Landing() {
               <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
                 Ask about the research
               </h2>
+              <div className="mx-auto mb-3 flex w-fit items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:hidden" aria-label="Reading level">
+                {(["layperson", "clinical", "scientific"] as const).map((level) => (
+                  <button key={level} type="button" onClick={() => setReadingLevel(level)} className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f]"} aria-pressed={readingLevel === level}>{level === "layperson" ? "Layperson" : level === "clinical" ? "Doctor" : "Scientist"}</button>
+                ))}
+              </div>
               <p className="mt-2 text-sm leading-6 text-[#6d837c]">
-                A research assistant grounded in the published evidence. Ask about findings,
+                Answers are tuned for {readingLevel === "layperson" ? "plain-language reading" : readingLevel === "clinical" ? "clinical reading" : "scientific reading"}. Ask about findings,
                 genetics, symptoms, or specific studies.
               </p>
             </div>
