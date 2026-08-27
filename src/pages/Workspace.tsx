@@ -54,10 +54,12 @@ export default function Workspace() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !selectedDocumentId) {
-      setMessages([]);
-      return;
-    }
+    // The chat panel is only rendered when a document is selected, so
+    // when selectedDocumentId is null the messages array is unused and
+    // we can skip the Firestore subscription entirely. Returning
+    // undefined is the documented way to opt out of the effect's
+    // cleanup path.
+    if (!user || !selectedDocumentId) return;
     return subscribeToChat(user.uid, selectedDocumentId, setMessages);
   }, [user, selectedDocumentId]);
 
@@ -127,7 +129,11 @@ export default function Workspace() {
     const item = value.trim();
     if (!item || profileDraft[kind].some((existing) => existing.toLowerCase() === item.toLowerCase())) return;
     setProfileDraft((current) => ({ ...current, [kind]: [...current[kind], item] }));
-    kind === "ailments" ? setAilmentInput("") : setDiagnosisInput("");
+    if (kind === "ailments") {
+      setAilmentInput("");
+    } else {
+      setDiagnosisInput("");
+    }
   }
 
   function addMedication() {
