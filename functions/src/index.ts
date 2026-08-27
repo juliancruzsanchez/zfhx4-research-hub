@@ -62,7 +62,7 @@ async function callGroq(
   return data.choices[0]?.message?.content ?? "";
 }
 
-/* ─── Existing: chatAboutResearch ───────────────────────────────────────────── */
+/* ─── chatAboutResearch ───────────────────────────────────────────────────── */
 
 const MODE_INSTRUCTIONS = {
   layman: "Use plain language, define unavoidable medical terms, and prioritize understandable explanations.",
@@ -110,9 +110,8 @@ export const chatAboutResearch = onCall(
     const contentSnap = await db.collection(SITE_CONTENT).doc(MAIN_DOC).get();
     const synthesis = contentSnap.data()?.currentUnderstanding ?? "";
 
-    const modeInstruction = MODE_INSTRUCTIONS[mode && mode in MODE_INSTRUCTIONS ? mode : "layman"];
     const selectedMode = mode && mode in MODE_INSTRUCTIONS ? mode : "layman";
-
+    const modeInstruction = MODE_INSTRUCTIONS[selectedMode];
     const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
     const msgs: Array<{ role: string; content: string }> = [
@@ -132,13 +131,11 @@ export const chatAboutResearch = onCall(
   },
 );
 
-/* ─── refreshPapers: search PubMed + medical journals, extract with Groq ─────── */
+/* ─── refreshPapers ─────────────────────────────────────────────────────── */
 
 export const refreshPapers = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
   async () => {
-    // Avoid external searches and AI extraction more than once every three days.
-    // Check last refresh — skip if still fresh.
     const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
     const contentSnap = await contentRef.get();
     const lastRefresh = contentSnap.data()?.lastRefreshAt as Timestamp | undefined;
@@ -149,15 +146,12 @@ export const refreshPapers = onCall(
       }
     }
 
-    // 1. Discover candidates from PubMed + Crossref (medical journals)
     const candidates = await discoverCandidates();
     if (candidates.length === 0) {
       return { skipped: true, message: "No new results found on PubMed or medical journals." };
     }
 
-    // 2. Extract with Groq + save pending
-    const { saved, skipped } = await extractAndSaveCandidates(candidates);
-
+    const { saved } = await extractAndSaveCandidates(candidates);
     if (saved === 0) {
       return { skipped: false, newPapers: 0, message: "All papers already in database." };
     }
@@ -170,7 +164,7 @@ export const refreshPapers = onCall(
   },
 );
 
-/* ─── publishPaper ──────────────────────────────────────────────────────────── */
+/* ─── publishPaper ──────────────────────────────────────────────────────── */
 
 export const publishPaper = onCall(
   { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
@@ -182,19 +176,13 @@ export const publishPaper = onCall(
     const snap = await ref.get();
     if (!snap.exists) throw new HttpsError("not-found", "Paper not found.");
 
-    await ref.update({
-      status: "published",
-      approvedAt: Timestamp.now(),
-    });
-
-    // Auto-synthesize after publishing
-    await runSynthesis();
-
+    await ref.update({ status: "published", approvedAt: Timestamp.now() });
+    await runAllSyntheses();
     return { success: true };
   },
 );
 
-/* ─── archivePaper ──────────────────────────────────────────────────────────── */
+/* ─── archivePaper ──────────────────────────────────────────────────────── */
 
 export const archivePaper = onCall(
   { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
@@ -206,19 +194,13 @@ export const archivePaper = onCall(
     const snap = await ref.get();
     if (!snap.exists) throw new HttpsError("not-found", "Paper not found.");
 
-    await ref.update({
-      status: "archived",
-      rejectedAt: Timestamp.now(),
-    });
-
-    // Re-synthesize after archiving
-    await runSynthesis();
-
+    await ref.update({ status: "archived", rejectedAt: Timestamp.now() });
+    await runAllSyntheses();
     return { success: true };
   },
 );
 
-/* ─── synthesizeUnderstanding ───────────────────────────────────────────────── */
+/* ─── synthesizeUnderstanding ───────────────────────────────────────────── */
 
 const SYNTHESIS_SYSTEM = `You are a biomedical research analyst creating a comprehensive synthesis of all published research on ZFHX4 loss of function. You will receive summaries and key findings from multiple papers. Your job:
 
@@ -245,34 +227,9 @@ Guidelines:
 - The total number of participants across all studies should be reflected in stats.
 - Icons: "users" for people/cohort findings, "dna" for genetics/mechanism, "search" for methods/discovery, "file" for publications/timeline.`;
 
-async function runSynthesis(mode: ReadingMode = "layman", force = false): Promise<void> {
-  const papersSnap = await db
-    .collection(PAPERS)
-    .where("status", "==", "published")
-    .get();
-
-  if (papersSnap.empty) return;
-
+/** Generate synthesis for a single mode and store with mode-specific keys. */
+async function runSynthesisForMode(mode: ReadingMode, paperSummaries: string): Promise<void> {
   const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
-  const contentSnapshot = await contentRef.get();
-  const cachedContent = contentSnapshot.data() as SiteContentData | undefined;
-  const cachedForMode = cachedContent?.aiCache?.[`synthesis:${mode}`];
-  if (!force && cachedForMode && isFresh(cachedForMode.createdAt)) return;
-
-  const papers = papersSnap.docs.map((d) => d.data() as PaperData);
-
-  const paperSummaries = papers
-    .map(
-      (p, i) =>
-        `### ${i + 1}. ${p.authors} (${p.year}) — "${p.title}"\n` +
-        `Journal: ${p.journal}\n` +
-        `Participants: ${p.participants}\n` +
-        `Type: ${p.type}\n` +
-        `Summary: ${p.summary}\n` +
-        `Key findings: ${p.keyFindings.join("; ")}\n` +
-        `Symptoms identified: ${p.symptomsIdentified.join("; ") || "Not specified"}`,
-    )
-    .join("\n\n");
 
   const extraction = await callGroq(
     [
@@ -295,12 +252,58 @@ async function runSynthesis(mode: ReadingMode = "layman", force = false): Promis
   try {
     result = JSON.parse(cleaned) as typeof result;
   } catch {
-    console.error("Failed to parse synthesis:", cleaned.slice(0, 500));
-    // Graceful fallback — don't crash
+    console.error(`Failed to parse synthesis for mode ${mode}:`, cleaned.slice(0, 500));
     return;
   }
 
-  // Compute total participants from all papers
+  // Store with mode-specific keys
+  await contentRef.set(
+    {
+      [`currentUnderstanding_${mode}`]: result.understanding ?? "",
+      [`highlights_${mode}`]: result.highlights ?? [],
+      [`stats_${mode}`]: result.stats ?? [],
+      aiCache: { [`synthesis:${mode}`]: { answer: "ok", createdAt: Timestamp.now() } },
+    },
+    { merge: true },
+  );
+
+  console.log(`Synthesis completed for mode: ${mode}`);
+}
+
+/** Generate all 3 reading-level syntheses in parallel, then update shared fields. */
+async function runAllSyntheses(): Promise<void> {
+  const papersSnap = await db
+    .collection(PAPERS)
+    .where("status", "==", "published")
+    .get();
+
+  if (papersSnap.empty) return;
+
+  const papers = papersSnap.docs.map((d) => d.data() as PaperData);
+
+  const paperSummaries = papers
+    .map(
+      (p, i) =>
+        `### ${i + 1}. ${p.authors} (${p.year}) — "${p.title}"\n` +
+        `Journal: ${p.journal}\n` +
+        `Participants: ${p.participants}\n` +
+        `Type: ${p.type}\n` +
+        `Summary: ${p.summary}\n` +
+        `Key findings: ${p.keyFindings.join("; ")}\n` +
+        `Symptoms identified: ${p.symptomsIdentified.join("; ") || "Not specified"}`,
+    )
+    .join("\n\n");
+
+  // Generate all 3 modes in parallel
+  await Promise.all(
+    (["layman", "clinical", "scientist"] as const).map((mode) =>
+      runSynthesisForMode(mode, paperSummaries).catch((err) =>
+        console.error(`Synthesis failed for ${mode}:`, err),
+      ),
+    ),
+  );
+
+  // Update shared / legacy fields from layman mode (default)
   const totalParticipants = papers.reduce((sum, p) => {
     const match = p.participants.match(/(\d+)/);
     return sum + (match ? parseInt(match[1], 10) : 0);
@@ -312,18 +315,11 @@ async function runSynthesis(mode: ReadingMode = "layman", force = false): Promis
   const minYear = yearRange.length > 0 ? Math.min(...yearRange) : 2021;
   const maxYear = yearRange.length > 0 ? Math.max(...yearRange) : 2025;
 
+  const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
   await contentRef.set(
     {
-      currentUnderstanding: result.understanding ?? "",
-      highlights: result.highlights ?? [],
-      stats: result.stats ?? [
-        { stat: String(totalParticipants || "—"), label: "people studied", detail: "across all published cohorts" },
-        { stat: String(papers.length), label: "research papers", detail: `${minYear} – ${maxYear}` },
-        { stat: "Active", label: "research area", detail: "ongoing studies" },
-      ],
       lastSynthesizedAt: Timestamp.now(),
       publishedPaperCount: papers.length,
-      aiCache: { [`synthesis:${mode}`]: { answer: JSON.stringify({ understanding: result.understanding ?? "", highlights: result.highlights ?? [], stats: result.stats ?? [] }), createdAt: Timestamp.now() } },
     },
     { merge: true },
   );
@@ -331,14 +327,13 @@ async function runSynthesis(mode: ReadingMode = "layman", force = false): Promis
 
 export const synthesizeUnderstanding = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
-  async (request) => {
-    const { mode } = request.data as { mode?: ReadingMode };
-    await runSynthesis(mode && mode in MODE_INSTRUCTIONS ? mode : "layman", true);
+  async () => {
+    await runAllSyntheses();
     return { success: true };
   },
 );
 
-/* ─── Scheduled weekly refresh ──────────────────────────────────────────────── */
+/* ─── Scheduled weekly refresh ──────────────────────────────────────────── */
 
 export const weeklyPaperRefresh = onSchedule(
   {
@@ -362,7 +357,6 @@ export const weeklyPaperRefresh = onSchedule(
       }
     }
 
-    // Discover from PubMed + medical journals
     const candidates = await discoverCandidates();
     if (candidates.length === 0) {
       console.log("No new candidates found.");

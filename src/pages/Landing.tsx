@@ -111,18 +111,22 @@ export default function Landing() {
     }
   }
 
-  /* Derived data */
-  const highlights = siteContent?.highlights ?? [];
-  const stats = siteContent?.stats ?? [];
-  const synthesis = siteContent?.currentUnderstanding ?? null;
+  /* Derived data — read mode-specific content from Firestore with fallbacks */
+  const modeKey = readingLevel;
+  const highlights = (siteContent as Record<string, unknown> | null)?.[`highlights_${modeKey}`] as SiteContent["highlights"] | undefined ?? siteContent?.highlights ?? [];
+  const stats = (siteContent as Record<string, unknown> | null)?.[`stats_${modeKey}`] as SiteContent["stats"] | undefined ?? siteContent?.stats ?? [];
+  const synthesis = (siteContent as Record<string, unknown> | null)?.[`currentUnderstanding_${modeKey}`] as string | undefined ?? siteContent?.currentUnderstanding ?? null;
   const readingCopy = synthesis;
   const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
   const normalizedStudySearch = studySearch.trim().toLowerCase();
-  const visiblePapers = papers.filter((paper) => {
-    const matchesCategory = studyCategory === "All studies" || paper.type === studyCategory;
+  const filteredPapers = papers.filter((paper) => {
     const searchable = [paper.title, paper.authors, paper.journal, paper.type, paper.summary, ...paper.tags, ...paper.symptomsIdentified].join(" ").toLowerCase();
-    return matchesCategory && (!normalizedStudySearch || searchable.includes(normalizedStudySearch));
+    return !normalizedStudySearch || searchable.includes(normalizedStudySearch);
   });
+  const papersByCategory = studyCategories.filter((cat) => cat !== "All studies").map((cat) => ({
+    category: cat,
+    papers: filteredPapers.filter((p) => p.type === cat),
+  }));
 
   return (
     <motion.main
@@ -407,7 +411,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ─── Studies — from Firestore papers ─────────────────────────────── */}
+      {/* ─── Studies — horizontal scrollers by category ────────────────── */}
       <section className="mx-auto max-w-[1240px] px-5 py-9 sm:px-8 sm:py-12 lg:px-10">
         <div className="mb-8">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.13em] text-[#6c827c]">
@@ -423,15 +427,10 @@ export default function Landing() {
         </div>
 
         {papers.length > 0 && (
-          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#dbe6e2] bg-white p-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
+          <div className="mb-8">
+            <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29a]" />
-              <Input value={studySearch} onChange={(event) => setStudySearch(event.target.value)} placeholder="Search studies, symptoms, genes, journals..." className="h-10 border-[#d5e2de] pl-9" />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {studyCategories.map((category) => (
-                <button key={category} type="button" onClick={() => setStudyCategory(category)} className={studyCategory === category ? "rounded-full bg-[#18322f] px-3 py-1.5 text-xs font-semibold text-white" : "rounded-full border border-[#d5e2de] px-3 py-1.5 text-xs font-medium text-[#607770] hover:bg-[#f2f8f5]"}>{category}</button>
-              ))}
+              <Input value={studySearch} onChange={(event) => setStudySearch(event.target.value)} placeholder="Search studies, symptoms, genes, journals..." className="h-10 w-full border-[#d5e2de] pl-9" />
             </div>
           </div>
         )}
@@ -446,105 +445,78 @@ export default function Landing() {
           </div>
         )}
 
-        <div className="space-y-4">
-          {visiblePapers.map((paper, index) => (
-            <motion.article
-              key={paper.id}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-30px" }}
-              transition={{ delay: index * 0.06, duration: 0.35 }}
-              className="group rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:p-7"
-            >
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-3xl">
-                  <div className="mb-4 flex flex-wrap items-center gap-2">
-                    <Badge className="border-0 bg-[#e7f4ef] px-2.5 py-1 text-[11px] font-semibold text-[#317762] hover:bg-[#e7f4ef]">
-                      {paper.type}
-                    </Badge>
-                    <span className="text-[11px] font-medium text-[#96ada6]">{paper.year}</span>
-                    {paper.openAccess && (
-                      <span className="text-[11px] font-medium text-[#78918a]">Open access</span>
-                    )}
-                  </div>
-                  <h3 className="text-lg font-semibold leading-7 tracking-[-0.025em] text-[#18322f] sm:text-xl sm:leading-8">
-                    {paper.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-[#71837f]">
-                    {paper.authors}{" "}
-                    <span className="mx-1.5 text-[#b0bfba]">·</span> {paper.journal}
-                  </p>
-                  <p className="mt-4 max-w-2xl text-sm leading-6 text-[#526965]">
-                    {paper.summary}
-                  </p>
-
-                  {paper.keyFindings.length > 0 && (
-                    <div className="mt-4 rounded-xl bg-[#f5f8f7] p-4">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#648079]">
-                        Key findings
-                      </p>
-                      <ul className="space-y-1.5">
-                        {paper.keyFindings.map((finding) => (
-                          <li
-                            key={finding}
-                            className="flex items-start gap-2 text-sm leading-5 text-[#3b5c54]"
-                          >
-                            <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-[#398b74]" />
-                            {finding}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {paper.tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {paper.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-md bg-[#f4f7f6] px-2 py-0.5 text-[11px] font-medium text-[#72847f]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-3 border-t border-[#edf1ef] pt-5 lg:w-[142px] lg:flex-col lg:items-stretch lg:border-0 lg:pt-1">
-                  <Button
-                    asChild
-                    className="h-10 flex-1 cursor-pointer gap-2 bg-[#398b74] px-4 text-sm font-medium text-white hover:bg-[#2d755f] lg:w-full lg:flex-none"
-                  >
-                    <a href={paper.link} target="_blank" rel="noopener noreferrer">
-                      Read paper
-                      <ExternalLink className="size-4" />
-                    </a>
-                  </Button>
-                  {paper.pdfLink && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="h-10 flex-1 cursor-pointer gap-2 border-[#d5e2de] px-4 text-sm font-medium text-[#526965] hover:bg-[#f5f8f7] lg:w-full lg:flex-none"
-                    >
-                      <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer">
-                        PDF
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    </Button>
-                  )}
-                  <span className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#8a9b96] lg:justify-start">
-                    <FileText className="size-3.5" />
-                    {paper.source}
-                  </span>
-                </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
-        {papers.length > 0 && visiblePapers.length === 0 && (
+        {filteredPapers.length === 0 && papers.length > 0 && (
           <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-12 text-center text-sm text-[#71837f]">No studies match your search.</div>
         )}
+
+        {papersByCategory.map(({ category, papers: catPapers }) => (
+          catPapers.length > 0 && (
+            <div key={category} className="mb-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-[#18322f]">{category}</h3>
+                <span className="text-xs text-[#71837f]">{catPapers.length} {catPapers.length === 1 ? "study" : "studies"}</span>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                {catPapers.map((paper) => (
+                  <motion.article
+                    key={paper.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-30px" }}
+                    transition={{ duration: 0.3 }}
+                    className="group w-[340px] min-w-[340px] shrink-0 rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:w-[380px] sm:min-w-[380px]"
+                  >
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-medium text-[#96ada6]">{paper.year}</span>
+                      {paper.openAccess && (
+                        <span className="text-[11px] font-medium text-[#78918a]">Open access</span>
+                      )}
+                    </div>
+                    <h4 className="mb-2 text-sm font-semibold leading-6 tracking-[-0.015em] text-[#18322f]">
+                      {paper.title}
+                    </h4>
+                    <p className="mb-3 text-xs text-[#71837f]">
+                      {paper.authors} <span className="text-[#b0bfba]">·</span> {paper.journal}
+                    </p>
+                    <p className="mb-3 text-xs leading-5 text-[#526965] line-clamp-3">
+                      {paper.summary}
+                    </p>
+                    {paper.keyFindings.length > 0 && (
+                      <div className="mb-3 rounded-xl bg-[#f5f8f7] p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#648079]">Key findings</p>
+                        <ul className="space-y-1">
+                          {paper.keyFindings.slice(0, 2).map((finding) => (
+                            <li key={finding} className="flex items-start gap-1.5 text-[11px] leading-4 text-[#3b5c54]">
+                              <ChevronRight className="mt-0.5 size-2.5 shrink-0 text-[#398b74]" />
+                              <span className="line-clamp-2">{finding}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {paper.tags.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-1">
+                        {paper.tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="rounded bg-[#f4f7f6] px-1.5 py-0.5 text-[10px] font-medium text-[#72847f]">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button asChild size="sm" className="h-8 flex-1 cursor-pointer gap-1.5 bg-[#398b74] px-3 text-[11px] text-white hover:bg-[#2d755f]">
+                        <a href={paper.link} target="_blank" rel="noopener noreferrer">Read <ExternalLink className="size-3" /></a>
+                      </Button>
+                      {paper.pdfLink && (
+                        <Button asChild variant="outline" size="sm" className="h-8 flex-1 cursor-pointer gap-1.5 border-[#d5e2de] px-3 text-[11px] text-[#526965] hover:bg-[#f5f8f7]">
+                          <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer">PDF <ExternalLink className="size-3" /></a>
+                        </Button>
+                      )}
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+            </div>
+          )
+        ))}
       </section>
 
       {/* ─── Footer ──────────────────────────────────────────────────────── */}
