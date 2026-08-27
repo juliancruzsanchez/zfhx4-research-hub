@@ -11,13 +11,14 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatAboutResearch, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
+import { useReadingLevel, readingLevelLabels, type ReadingLevel } from "@/lib/reading-level";
 import {
   subscribeToPublishedPapers,
   subscribeToSiteContent,
@@ -52,7 +53,8 @@ export default function Landing() {
   const [isTyping, setIsTyping] = useState(false);
   const [studySearch, setStudySearch] = useState("");
   const [studyCategory, setStudyCategory] = useState("All studies");
-  const [readingLevel, setReadingLevel] = useState<"layperson" | "clinical" | "scientific">("layperson");
+  const { readingLevel, setReadingLevel } = useReadingLevel();
+  const apiReadingLevel: ReadingLevel = readingLevel;
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to Firestore data
@@ -91,7 +93,7 @@ export default function Landing() {
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const { answer } = await chatAboutResearch(question, apiHistory, readingLevel === "layperson" ? "layman" : readingLevel === "clinical" ? "clinical" : "scientist");
+      const { answer } = await chatAboutResearch(question, apiHistory, apiReadingLevel);
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -112,12 +114,7 @@ export default function Landing() {
   const highlights = siteContent?.highlights ?? [];
   const stats = siteContent?.stats ?? [];
   const synthesis = siteContent?.currentUnderstanding ?? null;
-  const readingCopy = useMemo(() => {
-    if (!synthesis) return null;
-    if (readingLevel === "layperson") return synthesis;
-    if (readingLevel === "clinical") return `Clinical interpretation:\n\n${synthesis}`;
-    return `Scientific interpretation:\n\n${synthesis}`;
-  }, [synthesis, readingLevel]);
+  const readingCopy = synthesis;
   const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
   const normalizedStudySearch = studySearch.trim().toLowerCase();
   const visiblePapers = papers.filter((paper) => {
@@ -147,7 +144,7 @@ export default function Landing() {
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
             <div className="hidden items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:flex" aria-label="Reading level">
-              {(["layperson", "clinical", "scientific"] as const).map((level) => (
+              {(["layman", "clinical", "scientist"] as const).map((level) => (
                 <button
                   key={level}
                   type="button"
@@ -155,7 +152,7 @@ export default function Landing() {
                   className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"}
                   aria-pressed={readingLevel === level}
                 >
-                  {level === "layperson" ? "Layperson" : level === "clinical" ? "Doctor" : "Scientist"}
+                  {readingLevelLabels[level]}
                 </button>
               ))}
             </div>
@@ -275,7 +272,7 @@ export default function Landing() {
                   {iconMap[item.icon] ?? <FileText className="size-5" />}
                 </div>
                 <h3 className="text-base font-semibold text-[#18322f]">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#58706b]">{readingLevel === "layperson" ? item.body : readingLevel === "clinical" ? `Clinical interpretation: ${item.body}` : `Scientific interpretation: ${item.body}`}</p>
+                <p className="mt-2 text-sm leading-6 text-[#58706b]">{item.body}</p>
               </motion.div>
             ))}
           </div>
@@ -294,12 +291,12 @@ export default function Landing() {
                 Ask about the research
               </h2>
               <div className="mx-auto mb-3 flex w-fit items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:hidden" aria-label="Reading level">
-                {(["layperson", "clinical", "scientific"] as const).map((level) => (
-                  <button key={level} type="button" onClick={() => setReadingLevel(level)} className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f]"} aria-pressed={readingLevel === level}>{level === "layperson" ? "Layperson" : level === "clinical" ? "Doctor" : "Scientist"}</button>
+                {(["layman", "clinical", "scientist"] as const).map((level) => (
+                  <button key={level} type="button" onClick={() => setReadingLevel(level)} className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f]"} aria-pressed={readingLevel === level}>{readingLevelLabels[level]}</button>
                 ))}
               </div>
               <p className="mt-2 text-sm leading-6 text-[#6d837c]">
-                Answers are tuned for {readingLevel === "layperson" ? "plain-language reading" : readingLevel === "clinical" ? "clinical reading" : "scientific reading"}. Ask about findings,
+                All analysis is generated for the {readingLevelLabels[readingLevel].toLowerCase()} reading level. Ask about findings,
                 genetics, symptoms, or specific studies.
               </p>
             </div>
@@ -481,7 +478,7 @@ export default function Landing() {
                     <span className="mx-1.5 text-[#b0bfba]">·</span> {paper.journal}
                   </p>
                   <p className="mt-4 max-w-2xl text-sm leading-6 text-[#526965]">
-                    {readingLevel === "layperson" ? paper.summary : readingLevel === "clinical" ? `Clinical summary: ${paper.summary}` : `Scientific summary: ${paper.summary}`}
+                    {paper.summary}
                   </p>
 
                   {paper.keyFindings.length > 0 && (
@@ -492,11 +489,11 @@ export default function Landing() {
                       <ul className="space-y-1.5">
                         {paper.keyFindings.map((finding) => (
                           <li
-                            key={readingLevel === "layperson" ? finding : readingLevel === "clinical" ? `Clinical finding: ${finding}` : `Mechanistic finding: ${finding}`}
+                            key={finding}
                             className="flex items-start gap-2 text-sm leading-5 text-[#3b5c54]"
                           >
                             <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-[#398b74]" />
-                            {readingLevel === "layperson" ? finding : readingLevel === "clinical" ? `Clinical finding: ${finding}` : `Mechanistic finding: ${finding}`}
+                            {finding}
                           </li>
                         ))}
                       </ul>

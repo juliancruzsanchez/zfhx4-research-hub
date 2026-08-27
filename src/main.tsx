@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 import "./types/global.d.ts";
+import { ReadingLevelProvider } from "@/lib/reading-level";
 
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
@@ -42,7 +43,8 @@ createRoot(document.getElementById("root")!).render(
     <VlyToolbar />
     <InstrumentationProvider>
       <BrowserRouter>
-        <RouteSyncer />
+        <ReadingLevelProvider>
+          <RouteSyncer />
         <Suspense fallback={<RouteLoading />}>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -53,6 +55,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </ReadingLevelProvider>
       </BrowserRouter>
       <Toaster />
     </InstrumentationProvider>

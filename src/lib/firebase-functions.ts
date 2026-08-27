@@ -90,11 +90,11 @@ export async function archivePaper(paperId: string): Promise<{ success: boolean 
   return result.data;
 }
 
-export async function synthesizeUnderstanding(): Promise<{ success: boolean }> {
+export async function synthesizeUnderstanding(mode: "layman" | "clinical" | "scientist" = "layman"): Promise<{ success: boolean }> {
   const callable = httpsCallable<
-    Record<string, never>,
+    { mode: "layman" | "clinical" | "scientist" },
     { success: boolean }
   >(firebaseFunctions, "synthesizeUnderstanding");
-  const result = await callable({});
+  const result = await callable({ mode });
   return result.data;
 }

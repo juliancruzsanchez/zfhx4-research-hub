@@ -58,6 +58,14 @@ async function callGroq(
 
 /* ─── Existing: chatAboutResearch ───────────────────────────────────────────── */
 
+const MODE_INSTRUCTIONS = {
+  layman: "Use plain language, define unavoidable medical terms, and prioritize understandable explanations.",
+  clinical: "Use precise clinical terminology and organize findings for a doctor or clinical researcher.",
+  scientist: "Use technical molecular, genetic, and methodological terminology; distinguish established from preliminary evidence.",
+} as const;
+
+type ReadingMode = keyof typeof MODE_INSTRUCTIONS;
+
 const CHAT_SYSTEM = `You are a research assistant for a ZFHX4 Research Hub. Answer questions about published research on ZFHX4 loss of function. Be accurate, concise, and ground your answers in the evidence below. If unsure, say so and point to the relevant study.
 
 ## Guidelines
@@ -72,7 +80,7 @@ export const chatAboutResearch = onCall(
     const { message, history, mode } = request.data as {
       message: string;
       history?: Array<{ role: string; content: string }>;
-      mode?: "layman" | "score" | "scientist";
+      mode?: ReadingMode;
     };
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -96,11 +104,7 @@ export const chatAboutResearch = onCall(
     const contentSnap = await db.collection(SITE_CONTENT).doc(MAIN_DOC).get();
     const synthesis = contentSnap.data()?.currentUnderstanding ?? "";
 
-    const modeInstruction = mode === "scientist"
-      ? "Use technical biomedical language, include methods, limitations, variant mechanisms, and uncertainty precisely."
-      : mode === "score"
-        ? "For each major claim, include an evidence score from 0-100 and briefly explain whether it is supported by cohort, case report, model-system, or review evidence."
-        : "Explain findings in plain, non-technical language; define unavoidable scientific terms and prioritize practical clarity.";
+    const modeInstruction = MODE_INSTRUCTIONS[mode && mode in MODE_INSTRUCTIONS ? mode : "layman"];
     const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
     const msgs: Array<{ role: string; content: string }> = [
@@ -232,7 +236,7 @@ Guidelines:
 - The total number of participants across all studies should be reflected in stats.
 - Icons: "users" for people/cohort findings, "dna" for genetics/mechanism, "search" for methods/discovery, "file" for publications/timeline.`;
 
-async function runSynthesis(): Promise<void> {
+async function runSynthesis(mode: ReadingMode = "layman"): Promise<void> {
   const papersSnap = await db
     .collection(PAPERS)
     .where("status", "==", "published")
@@ -257,7 +261,7 @@ async function runSynthesis(): Promise<void> {
 
   const extraction = await callGroq(
     [
-      { role: "system", content: SYNTHESIS_SYSTEM },
+      { role: "system", content: `${SYNTHESIS_SYSTEM}\n\nReading level: ${MODE_INSTRUCTIONS[mode]}` },
       {
         role: "user",
         content: `Here are all published papers on ZFHX4 loss of function. Please synthesize the current understanding and generate highlights and stats.\n\n${paperSummaries}`,
@@ -312,8 +316,9 @@ async function runSynthesis(): Promise<void> {
 
 export const synthesizeUnderstanding = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
-  async () => {
-    await runSynthesis();
+  async (request) => {
+    const { mode } = request.data as { mode?: ReadingMode };
+    await runSynthesis(mode && mode in MODE_INSTRUCTIONS ? mode : "layman");
     return { success: true };
   },
 );
