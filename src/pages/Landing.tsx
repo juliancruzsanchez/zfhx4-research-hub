@@ -113,9 +113,9 @@ export default function Landing() {
 
   /* Derived data — read mode-specific content from Firestore with fallbacks */
   const modeKey = readingLevel;
-  const highlights = (siteContent as Record<string, unknown> | null)?.[`highlights_${modeKey}`] as SiteContent["highlights"] | undefined ?? siteContent?.highlights ?? [];
-  const stats = (siteContent as Record<string, unknown> | null)?.[`stats_${modeKey}`] as SiteContent["stats"] | undefined ?? siteContent?.stats ?? [];
-  const synthesis = (siteContent as Record<string, unknown> | null)?.[`currentUnderstanding_${modeKey}`] as string | undefined ?? siteContent?.currentUnderstanding ?? null;
+  const highlights = modeKey === "layman" ? siteContent?.highlights_layman ?? siteContent?.highlights ?? [] : modeKey === "clinical" ? siteContent?.highlights_clinical ?? siteContent?.highlights ?? [] : siteContent?.highlights_scientist ?? siteContent?.highlights ?? [];
+  const stats = modeKey === "layman" ? siteContent?.stats_layman ?? siteContent?.stats ?? [] : modeKey === "clinical" ? siteContent?.stats_clinical ?? siteContent?.stats ?? [] : siteContent?.stats_scientist ?? siteContent?.stats ?? [];
+  const synthesis = modeKey === "layman" ? siteContent?.currentUnderstanding_layman ?? siteContent?.currentUnderstanding ?? null : modeKey === "clinical" ? siteContent?.currentUnderstanding_clinical ?? siteContent?.currentUnderstanding ?? null : siteContent?.currentUnderstanding_scientist ?? siteContent?.currentUnderstanding ?? null;
   const readingCopy = synthesis;
   const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
   const normalizedStudySearch = studySearch.trim().toLowerCase();

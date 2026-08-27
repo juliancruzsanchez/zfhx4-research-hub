@@ -50,6 +50,15 @@ export interface SiteContent {
   lastSynthesizedAt?: { seconds: number; nanoseconds: number } | null;
   lastRefreshAt?: { seconds: number; nanoseconds: number } | null;
   publishedPaperCount: number;
+  currentUnderstanding_layman?: string;
+  currentUnderstanding_clinical?: string;
+  currentUnderstanding_scientist?: string;
+  highlights_layman?: Array<{ title: string; body: string; icon: string }>;
+  highlights_clinical?: Array<{ title: string; body: string; icon: string }>;
+  highlights_scientist?: Array<{ title: string; body: string; icon: string }>;
+  stats_layman?: Array<{ stat: string; label: string; detail: string }>;
+  stats_clinical?: Array<{ stat: string; label: string; detail: string }>;
+  stats_scientist?: Array<{ stat: string; label: string; detail: string }>;
 }
 
 /** Subscribe to all published papers for the homepage.

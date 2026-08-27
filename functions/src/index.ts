@@ -117,9 +117,10 @@ export const chatAboutResearch = onCall(
       .join("\n");
 
     const contentSnap = await db.collection(SITE_CONTENT).doc(MAIN_DOC).get();
-    const synthesis = contentSnap.data()?.currentUnderstanding ?? "";
-
+    const contentData = contentSnap.data() ?? {};
     const selectedMode = mode && mode in MODE_INSTRUCTIONS ? mode : "layman";
+    const synthesis = contentData[`currentUnderstanding_${selectedMode}`] ?? contentData.currentUnderstanding ?? "";
+
     const modeInstruction = MODE_INSTRUCTIONS[selectedMode];
     const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
