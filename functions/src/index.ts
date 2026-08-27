@@ -16,6 +16,7 @@ const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean);
 const CACHE_DAYS = 3;
 const CACHE_MS = CACHE_DAYS * 24 * 60 * 60 * 1000;
 
@@ -60,6 +61,14 @@ async function callGroq(
   };
 
   return data.choices[0]?.message?.content ?? "";
+}
+
+function assertAdmin(request: { auth?: { token?: Record<string, unknown> } | null }): void {
+  const email = typeof request.auth?.token?.email === "string" ? request.auth.token.email.toLowerCase() : "";
+  const adminClaim = request.auth?.token?.admin === true;
+  if (!adminClaim && (!email || !ADMIN_EMAILS.includes(email))) {
+    throw new HttpsError("permission-denied", "Admin access is required.");
+  }
 }
 
 /* ─── chatAboutResearch ───────────────────────────────────────────────────── */
@@ -135,7 +144,8 @@ export const chatAboutResearch = onCall(
 
 export const refreshPapers = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
-  async () => {
+  async (request) => {
+    assertAdmin(request);
     const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
     const contentSnap = await contentRef.get();
     const lastRefresh = contentSnap.data()?.lastRefreshAt as Timestamp | undefined;
@@ -169,6 +179,7 @@ export const refreshPapers = onCall(
 export const publishPaper = onCall(
   { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
+    assertAdmin(request);
     const { paperId } = request.data as { paperId: string };
     if (!paperId) throw new HttpsError("invalid-argument", "paperId is required.");
 
@@ -187,6 +198,7 @@ export const publishPaper = onCall(
 export const archivePaper = onCall(
   { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
+    assertAdmin(request);
     const { paperId } = request.data as { paperId: string };
     if (!paperId) throw new HttpsError("invalid-argument", "paperId is required.");
 
@@ -327,7 +339,8 @@ async function runAllSyntheses(): Promise<void> {
 
 export const synthesizeUnderstanding = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
-  async () => {
+  async (request) => {
+    assertAdmin(request);
     await runAllSyntheses();
     return { success: true };
   },

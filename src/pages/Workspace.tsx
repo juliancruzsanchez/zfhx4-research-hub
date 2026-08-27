@@ -20,6 +20,7 @@ function formatDate(value?: { seconds: number }) {
 
 export default function Workspace() {
   const { user, signOut } = useAuth();
+  const isAdmin = user?.email?.toLowerCase() === "admin@example.com";
   const navigate = useNavigate();
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -58,9 +59,9 @@ export default function Workspace() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isAdmin) return;
     return subscribeToAllPapers(setAllPapers);
-  }, [user]);
+  }, [user, isAdmin]);
 
   const selectedDocument = useMemo(() => documents.find((document) => document.id === selectedDocumentId) ?? null, [documents, selectedDocumentId]);
 
@@ -195,7 +196,7 @@ export default function Workspace() {
           </div>
           <Button variant="ghost" onClick={() => setActiveView("documents")} className={activeView === "documents" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileUp className="size-4" /> Medical records</Button>
           <Button variant="ghost" onClick={() => setActiveView("experiences")} className={activeView === "experiences" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Activity className="size-4" /> My experiences</Button>
-          <Button variant="ghost" onClick={() => setActiveView("papers")} className={activeView === "papers" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileText className="size-4" /> Research papers {allPapers.filter((p) => p.status === "pending").length > 0 && <Badge className="ml-auto bg-[#398b74] text-white">{allPapers.filter((p) => p.status === "pending").length}</Badge>}</Button>
+          {isAdmin ? <Button variant="ghost" onClick={() => setActiveView("papers")} className={activeView === "papers" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileText className="size-4" /> Research papers {allPapers.filter((p) => p.status === "pending").length > 0 && <Badge className="ml-auto bg-[#398b74] text-white">{allPapers.filter((p) => p.status === "pending").length}</Badge>}</Button> : null}
           <div className="mt-8 border-t border-[#dce7e3] px-1 pt-5 text-xs leading-5 text-[#82938e]">Uploaded records stay associated with your account. Do not upload anything you do not have permission to share.</div>
         </aside>
 
@@ -238,15 +239,14 @@ export default function Workspace() {
                     </div>
                   </>}
                 </div>
-              </div>
-            </div>
+              </div>            </div>
           ) : activeView === "experiences" ? (
             <div className="max-w-4xl space-y-6">
               <div><p className="text-sm text-[#6d837c]">Private notes for your care conversations</p><h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">My experiences</h2><p className="mt-3 text-sm leading-6 text-[#71837f]">Record symptoms, changes, and day-to-day experiences in your own words. This is not a diagnostic tool.</p></div>
               <form onSubmit={handleReportSubmit} className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6"><div className="grid gap-4 sm:grid-cols-[180px_1fr]"><label className="text-sm font-medium text-[#4d6860]">Date<input type="date" value={reportForm.date} onChange={(event) => setReportForm({ ...reportForm, date: event.target.value })} className="mt-2 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-sm" required /></label><label className="text-sm font-medium text-[#4d6860]">What did you notice?<Textarea value={reportForm.symptoms} onChange={(event) => setReportForm({ ...reportForm, symptoms: event.target.value })} placeholder="Describe symptoms or experiences in your own words" className="mt-2 min-h-24 border-[#d5e2de]" required /></label></div><label className="block text-sm font-medium text-[#4d6860]">How did it affect your day?<Textarea value={reportForm.impact} onChange={(event) => setReportForm({ ...reportForm, impact: event.target.value })} placeholder="Optional" className="mt-2 border-[#d5e2de]" /></label><label className="block text-sm font-medium text-[#4d6860]">Additional context<Textarea value={reportForm.notes} onChange={(event) => setReportForm({ ...reportForm, notes: event.target.value })} placeholder="Appointments, questions, or other context" className="mt-2 border-[#d5e2de]" /></label><Button type="submit" className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]"><Plus className="size-4" /> Save experience</Button></form>
               <div className="space-y-3">{reports.length === 0 && <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-5 py-10 text-center text-sm text-[#82938e]">Your saved experiences will appear here.</div>}{reports.map((report) => <article key={report.id} className="rounded-2xl border border-[#dbe6e2] bg-white p-5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#6f8981]">{report.date}</span><CheckCircle2 className="size-4 text-[#398b74]" /></div><p className="mt-3 text-sm leading-6 text-[#38574e]">{report.symptoms}</p>{report.impact && <p className="mt-3 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Impact:</span> {report.impact}</p>}{report.notes && <p className="mt-2 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Context:</span> {report.notes}</p>}</article>)}</div>
             </div>
-          ) : (
+          ) : isAdmin ? (
             /* ─── Research papers management ───────────────────────────── */
             <div className="max-w-4xl space-y-6">
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -374,7 +374,7 @@ export default function Workspace() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </section>
       </div>
     </main>
