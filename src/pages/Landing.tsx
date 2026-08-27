@@ -143,7 +143,7 @@ export default function Landing() {
           </a>
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
-            <div className="hidden items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:flex" aria-label="Reading level">
+            <div className="flex items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1" aria-label="Site reading level">
               {(["layman", "clinical", "scientist"] as const).map((level) => (
                 <button
                   key={level}
@@ -290,11 +290,6 @@ export default function Landing() {
               <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
                 Ask about the research
               </h2>
-              <div className="mx-auto mb-3 flex w-fit items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:hidden" aria-label="Reading level">
-                {(["layman", "clinical", "scientist"] as const).map((level) => (
-                  <button key={level} type="button" onClick={() => setReadingLevel(level)} className={readingLevel === level ? "rounded-md bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-md px-2.5 py-1.5 text-[11px] font-medium text-[#71837f]"} aria-pressed={readingLevel === level}>{readingLevelLabels[level]}</button>
-                ))}
-              </div>
               <p className="mt-2 text-sm leading-6 text-[#6d837c]">
                 All analysis is generated for the {readingLevelLabels[readingLevel].toLowerCase()} reading level. Ask about findings,
                 genetics, symptoms, or specific studies.
