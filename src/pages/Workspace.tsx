@@ -183,10 +183,7 @@ export default function Workspace() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]"><Activity className="size-[19px]" /></span>
             <span className="text-[15px] font-semibold">ZFHX4 Research Hub</span>
           </button>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-[#70857e] sm:inline">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="cursor-pointer gap-2 text-[#5e766f]"><LogOut className="size-4" /> Sign out</Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="cursor-pointer gap-2 text-[#5e766f]"><LogOut className="size-4 sm:hidden" /><span className="hidden sm:inline">Sign out</span></Button>
         </div>
       </header>
 
