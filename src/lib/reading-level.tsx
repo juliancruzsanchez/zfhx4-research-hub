@@ -33,7 +33,7 @@ export function useReadingLevel() {
 }
 
 export const readingLevelLabels: Record<ReadingLevel, string> = {
-  layman: "Layperson",
-  clinical: "Doctor",
-  scientist: "Scientist",
+  layman: "Easy to follow",
+  clinical: "For care teams",
+  scientist: "Research deep dive",
 };
