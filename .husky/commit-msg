@@ -1,11 +1,12 @@
 #!/usr/bin/env sh
 # Conventional Commits enforcement.
-# Runs after the editor closes and rejects commits that don't satisfy
-# commitlint.config.cjs. Mirrors the GitHub Actions PR title check.
 #
-# We resolve `commitlint` from node_modules/.bin (added by husky) so the
-# hook works the same on machines using npm, pnpm, yarn, or bun.
-. "$(dirname -- "$0")/_/h"
+# This file is invoked indirectly: git runs `.husky/_/commit-msg` (the
+# husky shim), which then runs this file. The shim already sets up the
+# shell environment and PATH, so we just need to call commitlint.
+#
+# Resolving from node_modules/.bin (added by husky) means the hook works
+# the same on machines using npm, pnpm, yarn, or bun.
 
 if [ -x node_modules/.bin/commitlint ]; then
   node_modules/.bin/commitlint --config commitlint.config.cjs --edit "$1"
