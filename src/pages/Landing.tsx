@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { chatAboutResearch, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
+import { chatAboutResearch, type ChatMessage as ApiChatMessage, type ResearchReadingMode } from "@/lib/firebase-functions";
 import {
   subscribeToPublishedPapers,
   subscribeToSiteContent,
@@ -52,6 +52,7 @@ export default function Landing() {
   const [isTyping, setIsTyping] = useState(false);
   const [studySearch, setStudySearch] = useState("");
   const [studyCategory, setStudyCategory] = useState("All studies");
+  const [readingMode, setReadingMode] = useState<ResearchReadingMode>("layman");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to Firestore data
@@ -90,7 +91,7 @@ export default function Landing() {
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const { answer } = await chatAboutResearch(question, apiHistory);
+      const { answer } = await chatAboutResearch(question, apiHistory, readingMode);
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -128,7 +129,7 @@ export default function Landing() {
     >
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="border-b border-[#dce7e3] bg-[#fbfcfb]">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <a href="/" className="flex items-center gap-3" aria-label="ZFHX4 Research Hub home">
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]">
               <Dna className="size-[19px]" strokeWidth={1.8} />
@@ -137,8 +138,13 @@ export default function Landing() {
               ZFHX4 Research Hub
             </span>
           </a>
-          <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
+            <div className="flex items-center gap-1 rounded-xl border border-[#d5e2de] bg-white p-1" aria-label="Finding reading mode">
+              {([['layman', "Layman's terms"], ['score', "Score"], ['scientist', "Scientist"]] as const).map(([mode, label]) => (
+                <button key={mode} type="button" onClick={() => setReadingMode(mode)} className={readingMode === mode ? "rounded-lg bg-[#18322f] px-2.5 py-1.5 text-[11px] font-semibold text-white" : "rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[#607770] hover:bg-[#f2f8f5]"}>{label}</button>
+              ))}
+            </div>
             <a
               href="/auth"
               className="inline-flex rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
@@ -163,7 +169,7 @@ export default function Landing() {
               <span className="flex size-6 items-center justify-center rounded-md bg-white text-[#397768] ring-1 ring-[#d4e7e0]">
                 <Sparkles className="size-3.5" />
               </span>
-              Peer-reviewed findings, clearly organized
+              Peer-reviewed findings · {readingMode === "layman" ? "plain language" : readingMode === "score" ? "evidence scores" : "technical detail"}
             </motion.div>
 
             <motion.h1
@@ -273,6 +279,7 @@ export default function Landing() {
               <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#18322f] sm:text-3xl">
                 Ask about the research
               </h2>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#398b74]">Mode: {readingMode === "layman" ? "Layman's terms" : readingMode === "score" ? "Score" : "Scientist"}</p>
               <p className="mt-2 text-sm leading-6 text-[#6d837c]">
                 A research assistant grounded in the published evidence. Ask about findings,
                 genetics, symptoms, or specific studies.

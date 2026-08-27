@@ -34,6 +34,8 @@ export async function chatWithDocument(documentId: string, question: string) {
   return result.data;
 }
 
+export type ResearchReadingMode = "layman" | "score" | "scientist";
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -42,12 +44,13 @@ export interface ChatMessage {
 export async function chatAboutResearch(
   message: string,
   history: ChatMessage[] = [],
+  mode: ResearchReadingMode = "layman",
 ) {
   const callable = httpsCallable<
-    { message: string; history: ChatMessage[] },
+    { message: string; history: ChatMessage[]; mode: ResearchReadingMode },
     ResearchChatResponse
   >(firebaseFunctions, "chatAboutResearch");
-  const result = await callable({ message, history });
+  const result = await callable({ message, history, mode });
   return result.data;
 }
 
