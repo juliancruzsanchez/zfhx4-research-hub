@@ -16,6 +16,12 @@ const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 const PAPERS = "papers" as const;
 const SITE_CONTENT = "siteContent" as const;
 const MAIN_DOC = "main" as const;
+const CACHE_DAYS = 3;
+const CACHE_MS = CACHE_DAYS * 24 * 60 * 60 * 1000;
+
+function isFresh(timestamp?: Timestamp): boolean {
+  return Boolean(timestamp && Date.now() - timestamp.toMillis() < CACHE_MS);
+}
 
 /* ─── Groq helper ───────────────────────────────────────────────────────────── */
 
@@ -105,6 +111,11 @@ export const chatAboutResearch = onCall(
     const synthesis = contentSnap.data()?.currentUnderstanding ?? "";
 
     const modeInstruction = MODE_INSTRUCTIONS[mode && mode in MODE_INSTRUCTIONS ? mode : "layman"];
+    const selectedMode = mode && mode in MODE_INSTRUCTIONS ? mode : "layman";
+    const cacheKey = `chat:${selectedMode}:${message.trim().toLowerCase()}:${JSON.stringify(history ?? []).slice(-2000)}`;
+    const cached = contentSnap.data()?.aiCache?.[cacheKey] as { answer?: string; createdAt?: Timestamp } | undefined;
+    if (cached?.answer && isFresh(cached.createdAt)) return { answer: cached.answer, cached: true };
+
     const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
     const msgs: Array<{ role: string; content: string }> = [
@@ -115,7 +126,8 @@ export const chatAboutResearch = onCall(
 
     try {
       const answer = await callGroq(msgs, 0.5);
-      return { answer };
+      await contentSnap.ref.set({ aiCache: { [cacheKey]: { answer, createdAt: Timestamp.now() } } }, { merge: true });
+      return { answer, cached: false };
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       console.error("chatAboutResearch error:", error);
@@ -129,14 +141,15 @@ export const chatAboutResearch = onCall(
 export const refreshPapers = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
   async () => {
-    // Check last refresh — skip if < 7 days old (unless called manually)
+    // Avoid external searches and AI extraction more than once every three days.
+    // Check last refresh — skip if still fresh.
     const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
     const contentSnap = await contentRef.get();
     const lastRefresh = contentSnap.data()?.lastRefreshAt as Timestamp | undefined;
     if (lastRefresh) {
       const daysSince = (Date.now() - lastRefresh.toMillis()) / (1000 * 60 * 60 * 24);
-      if (daysSince < 7) {
-        return { skipped: true, message: `Last refresh was ${Math.round(daysSince)} days ago. Refreshes run weekly.` };
+      if (daysSince < CACHE_DAYS) {
+        return { skipped: true, message: `Last refresh was ${Math.round(daysSince)} days ago. Refreshes run every three days.` };
       }
     }
 
@@ -236,13 +249,19 @@ Guidelines:
 - The total number of participants across all studies should be reflected in stats.
 - Icons: "users" for people/cohort findings, "dna" for genetics/mechanism, "search" for methods/discovery, "file" for publications/timeline.`;
 
-async function runSynthesis(mode: ReadingMode = "layman"): Promise<void> {
+async function runSynthesis(mode: ReadingMode = "layman", force = false): Promise<void> {
   const papersSnap = await db
     .collection(PAPERS)
     .where("status", "==", "published")
     .get();
 
   if (papersSnap.empty) return;
+
+  const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
+  const contentSnapshot = await contentRef.get();
+  const cachedContent = contentSnapshot.data() as SiteContentData | undefined;
+  const cachedForMode = cachedContent?.aiCache?.[`synthesis:${mode}`];
+  if (!force && cachedForMode && isFresh(cachedForMode.createdAt)) return;
 
   const papers = papersSnap.docs.map((d) => d.data() as PaperData);
 
@@ -297,7 +316,6 @@ async function runSynthesis(mode: ReadingMode = "layman"): Promise<void> {
   const minYear = yearRange.length > 0 ? Math.min(...yearRange) : 2021;
   const maxYear = yearRange.length > 0 ? Math.max(...yearRange) : 2025;
 
-  const contentRef = db.collection(SITE_CONTENT).doc(MAIN_DOC);
   await contentRef.set(
     {
       currentUnderstanding: result.understanding ?? "",
@@ -309,6 +327,7 @@ async function runSynthesis(mode: ReadingMode = "layman"): Promise<void> {
       ],
       lastSynthesizedAt: Timestamp.now(),
       publishedPaperCount: papers.length,
+      aiCache: { [`synthesis:${mode}`]: { answer: JSON.stringify({ understanding: result.understanding ?? "", highlights: result.highlights ?? [], stats: result.stats ?? [] }), createdAt: Timestamp.now() } },
     },
     { merge: true },
   );
@@ -318,7 +337,7 @@ export const synthesizeUnderstanding = onCall(
   { memory: "512MiB", timeoutSeconds: 120, secrets: [GROQ_API_KEY] },
   async (request) => {
     const { mode } = request.data as { mode?: ReadingMode };
-    await runSynthesis(mode && mode in MODE_INSTRUCTIONS ? mode : "layman");
+    await runSynthesis(mode && mode in MODE_INSTRUCTIONS ? mode : "layman", true);
     return { success: true };
   },
 );
@@ -341,7 +360,7 @@ export const weeklyPaperRefresh = onSchedule(
 
     if (lastRefresh) {
       const daysSince = (Date.now() - lastRefresh.toMillis()) / (1000 * 60 * 60 * 24);
-      if (daysSince < 7) {
+      if (daysSince < CACHE_DAYS) {
         console.log(`Skipping: last refresh was ${Math.round(daysSince)} days ago.`);
         return;
       }

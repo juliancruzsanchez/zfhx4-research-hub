@@ -56,4 +56,5 @@ export interface SiteContentData {
   lastSynthesizedAt: Timestamp | null;
   lastRefreshAt: Timestamp | null;
   publishedPaperCount: number;
+  aiCache?: Record<string, { answer: string; createdAt: Timestamp }>;
 }
