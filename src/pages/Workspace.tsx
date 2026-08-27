@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Activity, Archive, Bot, BookOpen, CheckCircle2, ExternalLink, FileText, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Plus, RefreshCcw, Send, Sparkles, UploadCloud } from "lucide-react";
+import { Activity, Archive, Bot, BookOpen, CheckCircle2, ExternalLink, FileText, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Plus, RefreshCcw, Send, Settings2, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { archivePaper, chatWithDocument, publishPaper, refreshPapers, synthesizeUnderstanding } from "@/lib/firebase-functions";
-import { createDocument, createSymptomReport, subscribeToAllPapers, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, type DocumentChatMessage, type PublicPaper, type ResearchDocument, type SymptomReport } from "@/lib/firebase-data";
+import { createDocument, createSymptomReport, saveUserProfile, subscribeToAllPapers, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, subscribeToUserProfile, type DocumentChatMessage, type Medication, type PublicPaper, type ResearchDocument, type SymptomReport, type UserProfile } from "@/lib/firebase-data";
 
 function formatDate(value?: { seconds: number }) {
   if (!value) return "Processing now";
@@ -30,11 +30,19 @@ export default function Workspace() {
   const [isAsking, setIsAsking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [researchConsent, setResearchConsent] = useState(false);
-  const [activeView, setActiveView] = useState<"documents" | "experiences" | "papers">("documents");
+  const [activeView, setActiveView] = useState<"documents" | "experiences" | "profile" | "papers">("documents");
+  const [profile, setProfile] = useState<UserProfile>({ userId: "", ailments: [], diagnoses: [], medications: [] });
+  const [profileDraft, setProfileDraft] = useState<UserProfile>({ userId: "", ailments: [], diagnoses: [], medications: [] });
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [ailmentInput, setAilmentInput] = useState("");
+  const [diagnosisInput, setDiagnosisInput] = useState("");
+  const [medicationDraft, setMedicationDraft] = useState({ name: "", purpose: "", dosage: "", notes: "" });
   const [allPapers, setAllPapers] = useState<PublicPaper[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [paperActionId, setPaperActionId] = useState<string | null>(null);
   const [reportForm, setReportForm] = useState({ date: new Date().toISOString().slice(0, 10), symptoms: "", impact: "", notes: "" });
+  const ailmentSuggestions = ["Developmental delay", "Speech or language differences", "Seizures", "Sleep difficulties", "Movement differences", "Feeding difficulties"];
+  const diagnosisSuggestions = ["ZFHX4-related disorder", "Kleefstra syndrome 2", "Epilepsy", "Autism spectrum disorder", "Developmental delay"];
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,6 +64,15 @@ export default function Workspace() {
   useEffect(() => {
     if (!user) return;
     return subscribeToSymptomReports(user.uid, setReports);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUserProfile(user.uid, (nextProfile) => {
+      const next = nextProfile ?? { userId: user.uid, ailments: [], diagnoses: [], medications: [] };
+      setProfile(next);
+      setProfileDraft(next);
+    });
   }, [user]);
 
   useEffect(() => {
@@ -104,6 +121,29 @@ export default function Workspace() {
     } finally {
       setIsAsking(false);
     }
+  }
+
+  function addProfileItem(kind: "ailments" | "diagnoses", value: string) {
+    const item = value.trim();
+    if (!item || profileDraft[kind].some((existing) => existing.toLowerCase() === item.toLowerCase())) return;
+    setProfileDraft((current) => ({ ...current, [kind]: [...current[kind], item] }));
+    kind === "ailments" ? setAilmentInput("") : setDiagnosisInput("");
+  }
+
+  function addMedication() {
+    if (!medicationDraft.name.trim() || !medicationDraft.dosage.trim()) return;
+    const medication: Medication = { id: crypto.randomUUID(), ...medicationDraft, name: medicationDraft.name.trim(), purpose: medicationDraft.purpose.trim(), dosage: medicationDraft.dosage.trim(), notes: medicationDraft.notes.trim() || undefined };
+    setProfileDraft((current) => ({ ...current, medications: [...current.medications, medication] }));
+    setMedicationDraft({ name: "", purpose: "", dosage: "", notes: "" });
+  }
+
+  async function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) return;
+    await saveUserProfile(user.uid, { ailments: profileDraft.ailments, diagnoses: profileDraft.diagnoses, medications: profileDraft.medications });
+    setProfileSaved(true);
+    toast.success("Your profile details were saved privately.");
+    window.setTimeout(() => setProfileSaved(false), 2500);
   }
 
   async function handleReportSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -196,6 +236,7 @@ export default function Workspace() {
           </div>
           <Button variant="ghost" onClick={() => setActiveView("documents")} className={activeView === "documents" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileUp className="size-4" /> Medical records</Button>
           <Button variant="ghost" onClick={() => setActiveView("experiences")} className={activeView === "experiences" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Activity className="size-4" /> My experiences</Button>
+          <Button variant="ghost" onClick={() => setActiveView("profile")} className={activeView === "profile" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Settings2 className="size-4" /> My health profile</Button>
           {isAdmin ? <Button variant="ghost" onClick={() => setActiveView("papers")} className={activeView === "papers" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileText className="size-4" /> Research papers {allPapers.filter((p) => p.status === "pending").length > 0 && <Badge className="ml-auto bg-[#398b74] text-white">{allPapers.filter((p) => p.status === "pending").length}</Badge>}</Button> : null}
           <div className="mt-8 border-t border-[#dce7e3] px-1 pt-5 text-xs leading-5 text-[#82938e]">Uploaded records stay associated with your account. Do not upload anything you do not have permission to share.</div>
         </aside>
@@ -243,8 +284,18 @@ export default function Workspace() {
           ) : activeView === "experiences" ? (
             <div className="max-w-4xl space-y-6">
               <div><p className="text-sm text-[#6d837c]">Private notes for your care conversations</p><h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">My experiences</h2><p className="mt-3 text-sm leading-6 text-[#71837f]">Record symptoms, changes, and day-to-day experiences in your own words. This is not a diagnostic tool.</p></div>
-              <form onSubmit={handleReportSubmit} className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6"><div className="grid gap-4 sm:grid-cols-[180px_1fr]"><label className="text-sm font-medium text-[#4d6860]">Date<input type="date" value={reportForm.date} onChange={(event) => setReportForm({ ...reportForm, date: event.target.value })} className="mt-2 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-sm" required /></label><label className="text-sm font-medium text-[#4d6860]">What did you notice?<Textarea value={reportForm.symptoms} onChange={(event) => setReportForm({ ...reportForm, symptoms: event.target.value })} placeholder="Describe symptoms or experiences in your own words" className="mt-2 min-h-24 border-[#d5e2de]" required /></label></div><label className="block text-sm font-medium text-[#4d6860]">How did it affect your day?<Textarea value={reportForm.impact} onChange={(event) => setReportForm({ ...reportForm, impact: event.target.value })} placeholder="Optional" className="mt-2 border-[#d5e2de]" /></label><label className="block text-sm font-medium text-[#4d6860]">Additional context<Textarea value={reportForm.notes} onChange={(event) => setReportForm({ ...reportForm, notes: event.target.value })} placeholder="Appointments, questions, or other context" className="mt-2 border-[#d5e2de]" /></label><Button type="submit" className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]"><Plus className="size-4" /> Save experience</Button></form>
+              <form onSubmit={handleReportSubmit} className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6"><div className="grid gap-4 sm:grid-cols-[180px_1fr]"><label className="text-sm font-medium text-[#4d6860]">Date<input type="date" value={reportForm.date} onChange={(event) => setReportForm({ ...reportForm, date: event.target.value })} className="mt-2 h-10 w-full rounded-md border border-[#d5e2de] bg-white px-3 text-sm" required /></label><label className="text-sm font-medium text-[#4d6860]">What did you notice?<Textarea value={reportForm.symptoms} onChange={(event) => setReportForm({ ...reportForm, symptoms: event.target.value })} placeholder="Describe symptoms or experiences in your own words" className="mt-2 min-h-24 border-[#d5e2de]" required /><p className="mt-2 text-xs font-normal text-[#80928c]">Your profile includes: {profile.ailments.length ? profile.ailments.join(", ") : "no ailments added yet"}</p></label></div><label className="block text-sm font-medium text-[#4d6860]">How did it affect your day?<Textarea value={reportForm.impact} onChange={(event) => setReportForm({ ...reportForm, impact: event.target.value })} placeholder="Optional" className="mt-2 border-[#d5e2de]" /></label><label className="block text-sm font-medium text-[#4d6860]">Additional context<Textarea value={reportForm.notes} onChange={(event) => setReportForm({ ...reportForm, notes: event.target.value })} placeholder="Appointments, questions, or other context" className="mt-2 border-[#d5e2de]" /></label><Button type="submit" className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]"><Plus className="size-4" /> Save experience</Button></form>
               <div className="space-y-3">{reports.length === 0 && <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-5 py-10 text-center text-sm text-[#82938e]">Your saved experiences will appear here.</div>}{reports.map((report) => <article key={report.id} className="rounded-2xl border border-[#dbe6e2] bg-white p-5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#6f8981]">{report.date}</span><CheckCircle2 className="size-4 text-[#398b74]" /></div><p className="mt-3 text-sm leading-6 text-[#38574e]">{report.symptoms}</p>{report.impact && <p className="mt-3 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Impact:</span> {report.impact}</p>}{report.notes && <p className="mt-2 text-sm leading-6 text-[#71837f]"><span className="font-medium text-[#526d64]">Context:</span> {report.notes}</p>}</article>)}</div>
+            </div>
+          ) : activeView === "profile" ? (
+            <div className="max-w-4xl space-y-6">
+              <div><p className="text-sm text-[#6d837c]">Personal context for your private log</p><h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">My health profile</h2><p className="mt-3 text-sm leading-6 text-[#71837f]">Keep track of ailments, diagnoses, and medications in one place. This information is private to your account and is not medical advice.</p></div>
+              <form onSubmit={handleSaveProfile} className="space-y-6 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6">
+                <div><h3 className="font-semibold">Ailments and experiences</h3><p className="mt-1 text-sm text-[#71837f]">Add anything you experience or want to discuss with your care team.</p><div className="relative mt-3"><Input value={ailmentInput} onChange={(event) => setAilmentInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addProfileItem("ailments", ailmentInput); } }} placeholder="Start typing an ailment or symptom" className="border-[#d5e2de]" list="ailment-suggestions" /><datalist id="ailment-suggestions">{ailmentSuggestions.map((item) => <option key={item} value={item} />)}</datalist></div><div className="mt-3 flex flex-wrap gap-2">{profileDraft.ailments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-[#e7f4ef] px-3 py-1.5 text-xs font-medium text-[#286c59]">{item}<button type="button" onClick={() => setProfileDraft((current) => ({ ...current, ailments: current.ailments.filter((value) => value !== item) }))} aria-label={`Remove ${item}`}><Trash2 className="size-3" /></button></span>)}</div></div>
+                <div><h3 className="font-semibold">Diagnoses</h3><div className="relative mt-3"><Input value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addProfileItem("diagnoses", diagnosisInput); } }} placeholder="Search or add a diagnosis" className="border-[#d5e2de]" list="diagnosis-suggestions" /><datalist id="diagnosis-suggestions">{diagnosisSuggestions.map((item) => <option key={item} value={item} />)}</datalist></div><div className="mt-3 flex flex-wrap gap-2">{profileDraft.diagnoses.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-[#f5f8f7] px-3 py-1.5 text-xs font-medium text-[#526965]">{item}<button type="button" onClick={() => setProfileDraft((current) => ({ ...current, diagnoses: current.diagnoses.filter((value) => value !== item) }))} aria-label={`Remove ${item}`}><Trash2 className="size-3" /></button></span>)}</div></div>
+                <div><h3 className="font-semibold">Medications</h3><p className="mt-1 text-sm text-[#71837f]">Add the medication, what it is for, the dosage, and any notes you want to remember.</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><Input value={medicationDraft.name} onChange={(event) => setMedicationDraft({ ...medicationDraft, name: event.target.value })} placeholder="Medication name" className="border-[#d5e2de]" /><Input value={medicationDraft.purpose} onChange={(event) => setMedicationDraft({ ...medicationDraft, purpose: event.target.value })} placeholder="What is it for?" className="border-[#d5e2de]" /><Input value={medicationDraft.dosage} onChange={(event) => setMedicationDraft({ ...medicationDraft, dosage: event.target.value })} placeholder="Dosage, e.g. 10 mg twice daily" className="border-[#d5e2de]" /><Input value={medicationDraft.notes} onChange={(event) => setMedicationDraft({ ...medicationDraft, notes: event.target.value })} placeholder="Optional notes" className="border-[#d5e2de]" /></div><Button type="button" onClick={addMedication} className="mt-3 cursor-pointer gap-2 bg-[#edf5f2] text-[#286c59] hover:bg-[#dceee8]"><Plus className="size-4" /> Add medication</Button><div className="mt-4 space-y-2">{profileDraft.medications.map((medication) => <div key={medication.id} className="flex items-start justify-between gap-3 rounded-xl bg-[#f5f8f7] p-4"><div><p className="font-medium text-[#29483f]">{medication.name} <span className="font-normal text-[#71837f]">· {medication.dosage}</span></p>{medication.purpose && <p className="mt-1 text-sm text-[#526965]">For: {medication.purpose}</p>}{medication.notes && <p className="mt-1 text-xs text-[#80928c]">{medication.notes}</p>}</div><button type="button" onClick={() => setProfileDraft((current) => ({ ...current, medications: current.medications.filter((item) => item.id !== medication.id) }))} className="cursor-pointer text-[#8a6d5a]" aria-label={`Remove ${medication.name}`}><Trash2 className="size-4" /></button></div>)}</div></div>
+                <div className="flex items-center gap-3"><Button type="submit" className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]">{profileSaved ? <CheckCircle2 className="size-4" /> : null}{profileSaved ? "Saved" : "Save profile"}</Button><span className="text-xs text-[#80928c]">Only you can access these details.</span></div>
+              </form>
             </div>
           ) : isAdmin ? (
             /* ─── Research papers management ───────────────────────────── */

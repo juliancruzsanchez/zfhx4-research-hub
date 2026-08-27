@@ -4,6 +4,7 @@ import {
   doc,
   onSnapshot,
   serverTimestamp,
+  setDoc,
   updateDoc,
   type Unsubscribe,
 } from "firebase/firestore";
@@ -162,7 +163,24 @@ export interface SymptomReport {
   symptoms: string;
   impact?: string;
   notes?: string;
+  ailments?: string[];
   createdAt?: { seconds: number };
+}
+
+export interface Medication {
+  id: string;
+  name: string;
+  purpose: string;
+  dosage: string;
+  notes?: string;
+}
+
+export interface UserProfile {
+  userId: string;
+  ailments: string[];
+  diagnoses: string[];
+  medications: Medication[];
+  updatedAt?: { seconds: number };
 }
 
 export async function createDocument(userId: string, file: File, researchConsent: boolean) {
@@ -226,6 +244,31 @@ export function subscribeToChat(
     (err) => {
       console.error("subscribeToChat error:", err);
       onChange([]);
+    },
+  );
+}
+
+export async function saveUserProfile(
+  userId: string,
+  profile: Omit<UserProfile, "userId" | "updatedAt">,
+) {
+  await setDoc(doc(firestore, "userProfiles", userId), {
+    ...profile,
+    userId,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function subscribeToUserProfile(
+  userId: string,
+  onChange: (profile: UserProfile | null) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(firestore, "userProfiles", userId),
+    (snapshot) => onChange(snapshot.exists() ? (snapshot.data() as UserProfile) : null),
+    (err) => {
+      console.error("subscribeToUserProfile error:", err);
+      onChange(null);
     },
   );
 }
