@@ -11,7 +11,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -91,12 +91,7 @@ export default function Landing() {
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const levelPrompt = {
-        layperson: "Answer for a layperson using plain language and briefly define unavoidable medical terms.",
-        clinical: "Answer for a doctor or clinician using precise clinical terminology, while staying concise.",
-        scientific: "Answer for a scientist using technical molecular and genetic terminology and clearly distinguish evidence strength.",
-      }[readingLevel];
-      const { answer } = await chatAboutResearch(`${levelPrompt}\n\nQuestion: ${question}`, apiHistory);
+      const { answer } = await chatAboutResearch(question, apiHistory, readingLevel === "layperson" ? "layman" : readingLevel === "clinical" ? "clinical" : "scientist");
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -117,6 +112,12 @@ export default function Landing() {
   const highlights = siteContent?.highlights ?? [];
   const stats = siteContent?.stats ?? [];
   const synthesis = siteContent?.currentUnderstanding ?? null;
+  const readingCopy = useMemo(() => {
+    if (!synthesis) return null;
+    if (readingLevel === "layperson") return synthesis;
+    if (readingLevel === "clinical") return `Clinical interpretation:\n\n${synthesis}`;
+    return `Scientific interpretation:\n\n${synthesis}`;
+  }, [synthesis, readingLevel]);
   const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
   const normalizedStudySearch = studySearch.trim().toLowerCase();
   const visiblePapers = papers.filter((paper) => {
@@ -195,14 +196,14 @@ export default function Landing() {
               <span className="text-[#398b74]">neurodevelopmental disorder</span>
             </motion.h1>
 
-            {synthesis ? (
+            {readingCopy ? (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.45 }}
                 className="mt-6 max-w-xl space-y-3"
               >
-                {synthesis
+                {readingCopy
                   .split("\n\n")
                   .filter(Boolean)
                   .slice(0, 2)
@@ -274,7 +275,7 @@ export default function Landing() {
                   {iconMap[item.icon] ?? <FileText className="size-5" />}
                 </div>
                 <h3 className="text-base font-semibold text-[#18322f]">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#58706b]">{item.body}</p>
+                <p className="mt-2 text-sm leading-6 text-[#58706b]">{readingLevel === "layperson" ? item.body : readingLevel === "clinical" ? `Clinical interpretation: ${item.body}` : `Scientific interpretation: ${item.body}`}</p>
               </motion.div>
             ))}
           </div>
@@ -480,7 +481,7 @@ export default function Landing() {
                     <span className="mx-1.5 text-[#b0bfba]">·</span> {paper.journal}
                   </p>
                   <p className="mt-4 max-w-2xl text-sm leading-6 text-[#526965]">
-                    {paper.summary}
+                    {readingLevel === "layperson" ? paper.summary : readingLevel === "clinical" ? `Clinical summary: ${paper.summary}` : `Scientific summary: ${paper.summary}`}
                   </p>
 
                   {paper.keyFindings.length > 0 && (
@@ -491,11 +492,11 @@ export default function Landing() {
                       <ul className="space-y-1.5">
                         {paper.keyFindings.map((finding) => (
                           <li
-                            key={finding}
+                            key={readingLevel === "layperson" ? finding : readingLevel === "clinical" ? `Clinical finding: ${finding}` : `Mechanistic finding: ${finding}`}
                             className="flex items-start gap-2 text-sm leading-5 text-[#3b5c54]"
                           >
                             <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-[#398b74]" />
-                            {finding}
+                            {readingLevel === "layperson" ? finding : readingLevel === "clinical" ? `Clinical finding: ${finding}` : `Mechanistic finding: ${finding}`}
                           </li>
                         ))}
                       </ul>

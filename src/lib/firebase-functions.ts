@@ -42,12 +42,13 @@ export interface ChatMessage {
 export async function chatAboutResearch(
   message: string,
   history: ChatMessage[] = [],
+  mode: "layman" | "clinical" | "scientist" = "layman",
 ) {
   const callable = httpsCallable<
-    { message: string; history: ChatMessage[] },
+    { message: string; history: ChatMessage[]; mode: "layman" | "clinical" | "scientist" },
     ResearchChatResponse
   >(firebaseFunctions, "chatAboutResearch");
-  const result = await callable({ message, history });
+  const result = await callable({ message, history, mode });
   return result.data;
 }
 
