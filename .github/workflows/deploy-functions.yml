@@ -1,0 +1,48 @@
+# Deploy Firebase Functions + Firestore rules
+#
+# Triggers:
+#   - Push to main that changes files in functions/ or firestore.rules
+#   - Manual trigger from GitHub Actions tab
+#
+# Required GitHub Secrets:
+#   FIREBASE_SERVICE_ACCOUNT  — JSON key from a GCP service account
+#   FIREBASE_PROJECT_ID       — GCP project ID (zfhx4ai)
+
+name: Deploy Firebase Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - "firestore.rules"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Build functions
+        working-directory: functions
+        run: npm run build
+
+      - name: Deploy to Firebase
+        uses: firebaseextended/github-actions/deploy@master
+        with:
+          project: ${{ secrets.FIREBASE_PROJECT_ID }}
+          serviceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channel: live
+        env:
+          FIREBASE_CLI_PREBUILT_BINARY: true

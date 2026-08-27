@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase / secrets
+*-key.json
+*-service-account.json
+.firebase*
+bun.lock
+functions/bun.lock
