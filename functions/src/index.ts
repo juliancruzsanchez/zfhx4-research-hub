@@ -112,9 +112,6 @@ export const chatAboutResearch = onCall(
 
     const modeInstruction = MODE_INSTRUCTIONS[mode && mode in MODE_INSTRUCTIONS ? mode : "layman"];
     const selectedMode = mode && mode in MODE_INSTRUCTIONS ? mode : "layman";
-    const cacheKey = `chat:${selectedMode}:${message.trim().toLowerCase()}:${JSON.stringify(history ?? []).slice(-2000)}`;
-    const cached = contentSnap.data()?.aiCache?.[cacheKey] as { answer?: string; createdAt?: Timestamp } | undefined;
-    if (cached?.answer && isFresh(cached.createdAt)) return { answer: cached.answer, cached: true };
 
     const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
@@ -126,8 +123,7 @@ export const chatAboutResearch = onCall(
 
     try {
       const answer = await callGroq(msgs, 0.5);
-      await contentSnap.ref.set({ aiCache: { [cacheKey]: { answer, createdAt: Timestamp.now() } } }, { merge: true });
-      return { answer, cached: false };
+      return { answer };
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       console.error("chatAboutResearch error:", error);
