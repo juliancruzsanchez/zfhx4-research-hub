@@ -50,6 +50,8 @@ export default function Landing() {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [studySearch, setStudySearch] = useState("");
+  const [studyCategory, setStudyCategory] = useState("All studies");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to Firestore data
@@ -109,6 +111,13 @@ export default function Landing() {
   const highlights = siteContent?.highlights ?? [];
   const stats = siteContent?.stats ?? [];
   const synthesis = siteContent?.currentUnderstanding ?? null;
+  const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
+  const normalizedStudySearch = studySearch.trim().toLowerCase();
+  const visiblePapers = papers.filter((paper) => {
+    const matchesCategory = studyCategory === "All studies" || paper.type === studyCategory;
+    const searchable = [paper.title, paper.authors, paper.journal, paper.type, paper.summary, ...paper.tags, ...paper.symptomsIdentified].join(" ").toLowerCase();
+    return matchesCategory && (!normalizedStudySearch || searchable.includes(normalizedStudySearch));
+  });
 
   return (
     <motion.main
@@ -340,6 +349,14 @@ export default function Landing() {
               </form>
 
               {/* Suggested questions */}
+              {chatMessages.length === 0 && (
+                <div className="mx-4 mb-3 rounded-xl border border-dashed border-[#cbdad5] bg-[#f8fbfa] p-4 text-center sm:mx-5">
+                  <Sparkles className="mx-auto size-4 text-[#398b74]" />
+                  <p className="mt-2 text-sm font-medium text-[#38574e]">Your research conversation will appear here</p>
+                  <p className="mt-1 text-xs leading-5 text-[#7b8f89]">Ask a question below or choose a suggested prompt to explore the published evidence.</p>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5">
                 {(chatMessages.length === 0
                   ? [
@@ -382,10 +399,23 @@ export default function Landing() {
             Read the evidence
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#71837f]">
-            {papers.length} published {papers.length === 1 ? "paper" : "papers"} in
-            chronological order. Open access where available.
+            {papers.length} published {papers.length === 1 ? "paper" : "papers"}. Search by topic, symptom, author, or journal.
           </p>
         </div>
+
+        {papers.length > 0 && (
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#dbe6e2] bg-white p-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29a]" />
+              <Input value={studySearch} onChange={(event) => setStudySearch(event.target.value)} placeholder="Search studies, symptoms, genes, journals..." className="h-10 border-[#d5e2de] pl-9" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {studyCategories.map((category) => (
+                <button key={category} type="button" onClick={() => setStudyCategory(category)} className={studyCategory === category ? "rounded-full bg-[#18322f] px-3 py-1.5 text-xs font-semibold text-white" : "rounded-full border border-[#d5e2de] px-3 py-1.5 text-xs font-medium text-[#607770] hover:bg-[#f2f8f5]"}>{category}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {papers.length === 0 && (
           <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-16 text-center">
@@ -398,7 +428,7 @@ export default function Landing() {
         )}
 
         <div className="space-y-4">
-          {papers.map((paper, index) => (
+          {visiblePapers.map((paper, index) => (
             <motion.article
               key={paper.id}
               initial={{ opacity: 0, y: 12 }}
@@ -493,6 +523,9 @@ export default function Landing() {
             </motion.article>
           ))}
         </div>
+        {papers.length > 0 && visiblePapers.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-12 text-center text-sm text-[#71837f]">No studies match your search.</div>
+        )}
       </section>
 
       {/* ─── Footer ──────────────────────────────────────────────────────── */}
