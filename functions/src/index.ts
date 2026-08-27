@@ -69,9 +69,10 @@ const CHAT_SYSTEM = `You are a research assistant for a ZFHX4 Research Hub. Answ
 export const chatAboutResearch = onCall(
   { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
   async (request) => {
-    const { message, history } = request.data as {
+    const { message, history, mode } = request.data as {
       message: string;
       history?: Array<{ role: string; content: string }>;
+      mode?: "layman" | "score" | "scientist";
     };
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -95,7 +96,12 @@ export const chatAboutResearch = onCall(
     const contentSnap = await db.collection(SITE_CONTENT).doc(MAIN_DOC).get();
     const synthesis = contentSnap.data()?.currentUnderstanding ?? "";
 
-    const systemMsg = `${CHAT_SYSTEM}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
+    const modeInstruction = mode === "scientist"
+      ? "Use technical biomedical language, include methods, limitations, variant mechanisms, and uncertainty precisely."
+      : mode === "score"
+        ? "For each major claim, include an evidence score from 0-100 and briefly explain whether it is supported by cohort, case report, model-system, or review evidence."
+        : "Explain findings in plain, non-technical language; define unavoidable scientific terms and prioritize practical clarity.";
+    const systemMsg = `${CHAT_SYSTEM}\n\n## Reading mode\n${modeInstruction}\n\n## Current published research\n${paperContext}\n\n## Synthesized understanding\n${synthesis}`;
 
     const msgs: Array<{ role: string; content: string }> = [
       { role: "system", content: systemMsg },
