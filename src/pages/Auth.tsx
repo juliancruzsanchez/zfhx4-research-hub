@@ -63,6 +63,11 @@ function Auth() {
             <CardDescription className="mt-2 leading-6">Save medical record uploads, findings, document questions, and symptom experiences in one private workspace.</CardDescription>
           </div>
         </CardHeader>
+        <CardContent className="pt-0 text-center">
+          <button type="button" onClick={() => navigate("/")} className="text-xs font-medium text-[#526965] underline-offset-2 hover:underline">
+            ← Back to home
+          </button>
+        </CardContent>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="relative">
@@ -75,7 +80,7 @@ function Auth() {
             </div>
             {error && <p className="text-sm leading-5 text-red-600">{error}</p>}
           </CardContent>
-          <CardFooter className="flex-col gap-4">
+          <CardFooter className="flex-col gap-4 pt-2">
             <Button type="submit" className="h-11 w-full cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               {mode === "signIn" ? "Sign in" : "Create account"}

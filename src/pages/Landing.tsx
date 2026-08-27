@@ -350,6 +350,29 @@ export default function Landing() {
                 <div ref={chatEndRef} />
               </div>
 
+              {/* Suggested questions — only before first message, above input */}
+              {chatMessages.length === 0 && !isTyping && (
+                <div className="border-t border-[#edf1ef] px-4 py-3 sm:px-5">
+                  <p className="mb-2 text-center text-xs font-medium text-[#7b8f89]">Try asking:</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {["What developmental features are associated with ZFHX4 loss of function?",
+                      "How was the ZFHX4 connection discovered?",
+                      "What do zebrafish studies tell us?",
+                      "Is this condition inherited?",
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => handleSend(q)}
+                        className="cursor-pointer rounded-full border border-[#d5e2de] bg-white px-3 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:border-[#9ec8bb] hover:bg-[#f2f8f5]"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Input */}
               <form
                 onSubmit={(e) => {
@@ -375,42 +398,6 @@ export default function Landing() {
                   <Send className="size-4" />
                 </Button>
               </form>
-
-              {/* Suggested questions */}
-              {chatMessages.length === 0 && (
-                <div className="mx-4 mb-3 rounded-xl border border-dashed border-[#cbdad5] bg-[#f8fbfa] p-4 text-center sm:mx-5">
-                  <Sparkles className="mx-auto size-4 text-[#398b74]" />
-                  <p className="mt-2 text-sm font-medium text-[#38574e]">Your research conversation will appear here</p>
-                  <p className="mt-1 text-xs leading-5 text-[#7b8f89]">Ask a question below or choose a suggested prompt to explore the published evidence.</p>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2 border-t border-[#edf1ef] px-4 py-3 sm:px-5">
-                {(chatMessages.length === 0
-                  ? [
-                      "What developmental features are associated with ZFHX4 loss of function?",
-                      "How was the ZFHX4 connection discovered?",
-                      "What do zebrafish studies tell us?",
-                      "Is this condition inherited?",
-                    ]
-                  : [
-                      "What are the main symptoms?",
-                      "How is this diagnosed?",
-                      "Are there treatment options?",
-                      "What research is ongoing?",
-                    ]
-                ).map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    disabled={isTyping}
-                    onClick={() => handleSend(q)}
-                    className="cursor-pointer rounded-full border border-[#d5e2de] bg-white px-3 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:border-[#9ec8bb] hover:bg-[#f2f8f5] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         </div>
