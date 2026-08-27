@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# Conventional Commits enforcement.
+# Runs after the editor closes and rejects commits that don't satisfy
+# commitlint.config.cjs. Mirrors the GitHub Actions PR title check.
+#
+# We resolve `commitlint` from node_modules/.bin (added by husky) so the
+# hook works the same on machines using npm, pnpm, yarn, or bun.
+. "$(dirname -- "$0")/_/h"
+
+if [ -x node_modules/.bin/commitlint ]; then
+  node_modules/.bin/commitlint --config commitlint.config.cjs --edit "$1"
+else
+  echo "husky - commit-msg: commitlint is not installed. Run 'bun install' (or your package manager's install command) and retry." >&2
+  exit 1
+fi

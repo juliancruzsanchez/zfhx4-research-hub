@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Format and lint staged files before they land. See `lint-staged` in
+# package.json for the per-glob command list. The hook resolves the
+# `lint-staged` binary from `node_modules/.bin` (added by husky itself)
+# so contributors using any package manager — npm, pnpm, yarn, or bun —
+# get the same behaviour without per-machine PATH tweaks.
+. "$(dirname -- "$0")/_/h"
+
+lint_staged() {
+  if [ -x node_modules/.bin/lint-staged ]; then
+    node_modules/.bin/lint-staged "$@"
+  else
+    echo "husky - pre-commit: lint-staged is not installed. Run 'bun install' (or your package manager's install command) and retry." >&2
+    exit 1
+  fi
+}
+
+lint_staged "$@"
