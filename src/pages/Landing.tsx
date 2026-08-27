@@ -132,7 +132,7 @@ export default function Landing() {
     >
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="border-b border-[#dce7e3] bg-[#fbfcfb]">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-5 py-4 sm:flex-nowrap sm:px-8 lg:px-10">
           <a href="/" className="flex items-center gap-3" aria-label="ZFHX4 Research Hub home">
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]">
               <Dna className="size-[19px]" strokeWidth={1.8} />
@@ -143,7 +143,7 @@ export default function Landing() {
           </a>
           <div className="flex items-center gap-2 text-xs font-medium text-[#6a7d79] sm:gap-5">
             <span className="hidden sm:inline">A customer research resource</span>
-            <div className="flex items-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1" aria-label="Site reading level">
+            <div className="order-3 flex w-full items-center justify-center gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:order-none sm:w-auto sm:justify-start" aria-label="Site reading level">
               {(["layman", "clinical", "scientist"] as const).map((level) => (
                 <button
                   key={level}
