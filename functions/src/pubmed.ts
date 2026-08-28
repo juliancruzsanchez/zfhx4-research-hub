@@ -11,41 +11,6 @@ interface ESearchResult {
   };
 }
 
-interface PubmedArticle {
-  PubmedArticle: {
-    MedlineCitation: {
-      PMID: { _: string };
-      Article: {
-        ArticleTitle: string | { _: string };
-        Abstract?: {
-          AbstractText: Array<{ _: string } | string>;
-        };
-        Journal: {
-          Title: string;
-          JournalIssue?: {
-            PubDate?: {
-              Year?: string;
-            };
-          };
-        };
-        AuthorList?: {
-          Author: Array<{
-            LastName?: string;
-            Initials?: string;
-            ForeName?: string;
-          }>;
-        };
-      };
-    };
-    PubmedData?: {
-      ArticleIdList?: Array<{
-        _: string;
-        $: { IdType: string };
-      }>;
-    };
-  };
-}
-
 export interface PubMedSearchResult {
   pmid: string;
   title: string;

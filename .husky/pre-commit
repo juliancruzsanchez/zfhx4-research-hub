@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Format and lint staged files before they land. See `lint-staged` in
+# package.json for the per-glob command list.
+#
+# This file is invoked indirectly: git runs `.husky/_/pre-commit` (the
+# husky shim), which then runs this file. The shim already sets up the
+# shell environment and PATH, so we just need to call lint-staged.
+
+if [ -x node_modules/.bin/lint-staged ]; then
+  node_modules/.bin/lint-staged "$@"
+else
+  echo "husky - pre-commit: lint-staged is not installed. Run 'bun install' (or your package manager's install command) and retry." >&2
+  exit 1
+fi

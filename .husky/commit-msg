@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Conventional Commits enforcement.
+#
+# This file is invoked indirectly: git runs `.husky/_/commit-msg` (the
+# husky shim), which then runs this file. The shim already sets up the
+# shell environment and PATH, so we just need to call commitlint.
+#
+# Resolving from node_modules/.bin (added by husky) means the hook works
+# the same on machines using npm, pnpm, yarn, or bun.
+
+if [ -x node_modules/.bin/commitlint ]; then
+  node_modules/.bin/commitlint --config commitlint.config.cjs --edit "$1"
+else
+  echo "husky - commit-msg: commitlint is not installed. Run 'bun install' (or your package manager's install command) and retry." >&2
+  exit 1
+fi
