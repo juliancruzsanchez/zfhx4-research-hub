@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { archivePaper, chatWithDocument, publishPaper, refreshPapers, synthesizeUnderstanding } from "@/lib/firebase-functions";
 import { createDocument, createSymptomReport, saveUserProfile, subscribeToAllPapers, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, subscribeToUserProfile, type DocumentChatMessage, type Medication, type PublicPaper, type ResearchDocument, type SymptomReport, type UserProfile } from "@/lib/firebase-data";
@@ -20,7 +21,7 @@ function formatDate(value?: { seconds: number }) {
 
 export default function Workspace() {
   const { user, signOut } = useAuth();
-  const isAdmin = user?.email?.toLowerCase() === "admin@example.com";
+  const isAdmin = useAdmin(user);
   const navigate = useNavigate();
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
