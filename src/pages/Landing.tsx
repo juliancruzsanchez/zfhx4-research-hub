@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
+  ChevronLeft,
   ChevronRight,
   Dna,
   ExternalLink,
@@ -66,6 +67,16 @@ export default function Landing() {
   const apiReadingLevel: ReadingLevel = readingLevel;
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messageIdRef = useRef(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const scrollEvidence = useCallback((direction: "left" | "right") => {
+    if (!scrollerRef.current) return;
+    const amount = scrollerRef.current.offsetWidth * 0.75;
+    scrollerRef.current.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  }, []);
 
   // Subscribe to Firestore data
   useEffect(() => {
@@ -456,7 +467,7 @@ export default function Landing() {
                     <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#edf5f2] to-[#d9ede6]">
                       <MessageCircle className="size-7 text-[#398b74]" />
                     </div>
-                    <p className="text-sm font-semibold text-[#3b5c54]">Type to get started</p>
+                    <p className="text-sm font-semibold text-[#3b5c54]">Send a message to get started</p>
                     <p className="mt-1.5 max-w-[280px] text-xs leading-5 text-[#7b8f89]">Ask about ZFHX4 research, symptoms, genetics, or specific studies.</p>
                   </div>
                 )}
@@ -622,16 +633,20 @@ export default function Landing() {
                     {catPapers.length === 1 ? "study" : "studies"}
                   </span>
                 </div>
-                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                  {catPapers.map((paper) => (
-                    <motion.article
-                      key={paper.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-30px" }}
-                      transition={{ duration: 0.3 }}
-                      className="group w-[340px] min-w-[340px] shrink-0 rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:w-[380px] sm:min-w-[380px]"
-                    >
+                <div className="relative">
+                  <div
+                    ref={scrollerRef}
+                    className="scroll-snap-x flex gap-4 overflow-x-auto pb-2 scrollbar-thin"
+                  >
+                    {catPapers.map((paper) => (
+                      <motion.article
+                        key={paper.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, margin: "-30px" }}
+                        transition={{ duration: 0.3 }}
+                        className="group w-[340px] min-w-[340px] shrink-0 rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:w-[380px] sm:min-w-[380px]"
+                      >
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         <span className="text-[11px] font-medium text-[#96ada6]">
                           {paper.year}
@@ -716,6 +731,22 @@ export default function Landing() {
                       </div>
                     </motion.article>
                   ))}
+                  </div>
+                  {/* Scroll arrows — desktop only */}
+                  <button
+                    onClick={() => scrollEvidence("left")}
+                    className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-[#d5e2de] bg-white/90 p-1.5 text-[#526965] shadow-sm backdrop-blur transition-colors hover:bg-[#f5f8f7] hover:text-[#2d755f] md:block"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => scrollEvidence("right")}
+                    className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-[#d5e2de] bg-white/90 p-1.5 text-[#526965] shadow-sm backdrop-blur transition-colors hover:bg-[#f5f8f7] hover:text-[#2d755f] md:block"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
               </div>
             ),
