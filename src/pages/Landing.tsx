@@ -15,7 +15,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatAboutResearch, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
@@ -53,7 +52,6 @@ export default function Landing() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [studySearch, setStudySearch] = useState("");
-  const [studyCategory, setStudyCategory] = useState("All studies");
   const { readingLevel, setReadingLevel } = useReadingLevel();
   const apiReadingLevel: ReadingLevel = readingLevel;
   const chatEndRef = useRef<HTMLDivElement>(null);
