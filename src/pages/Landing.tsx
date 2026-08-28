@@ -55,6 +55,7 @@ export default function Landing() {
   const { readingLevel, setReadingLevel } = useReadingLevel();
   const apiReadingLevel: ReadingLevel = readingLevel;
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const messageIdRef = useRef(0);
 
   // Subscribe to Firestore data
   useEffect(() => {
@@ -78,8 +79,14 @@ export default function Landing() {
     const question = (text ?? chatInput).trim();
     if (!question || isTyping) return;
 
+    // Stable IDs for the chat list. We use a ref counter instead of
+    // Date.now() so the IDs are deterministic across renders and the
+    // eslint react-hooks/purity rule (which forbids calling impure
+    // functions like Date.now during a render pass) does not flag the
+    // event handler.
+    const userId = `u-${++messageIdRef.current}`;
     const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
+      id: userId,
       role: "user",
       content: question,
     };
@@ -95,7 +102,7 @@ export default function Landing() {
       const { answer } = await chatAboutResearch(question, apiHistory, apiReadingLevel);
 
       const assistantMsg: ChatMessage = {
-        id: `a-${Date.now()}`,
+        id: `a-${++messageIdRef.current}`,
         role: "assistant",
         content: answer,
       };
