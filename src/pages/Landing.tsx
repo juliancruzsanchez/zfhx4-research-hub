@@ -17,8 +17,15 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { chatAboutResearch, type ChatMessage as ApiChatMessage } from "@/lib/firebase-functions";
-import { useReadingLevel, readingLevelLabels, type ReadingLevel } from "@/lib/reading-level";
+import {
+  chatAboutResearch,
+  type ChatMessage as ApiChatMessage,
+} from "@/lib/firebase-functions";
+import {
+  useReadingLevel,
+  readingLevelLabels,
+  type ReadingLevel,
+} from "@/lib/reading-level";
 import {
   subscribeToPublishedPapers,
   subscribeToSiteContent,
@@ -99,7 +106,11 @@ export default function Landing() {
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const { answer } = await chatAboutResearch(question, apiHistory, apiReadingLevel);
+      const { answer } = await chatAboutResearch(
+        question,
+        apiHistory,
+        apiReadingLevel,
+      );
 
       const assistantMsg: ChatMessage = {
         id: `a-${++messageIdRef.current}`,
@@ -118,20 +129,56 @@ export default function Landing() {
 
   /* Derived data — read mode-specific content from Firestore with fallbacks */
   const modeKey = readingLevel;
-  const highlights = modeKey === "layman" ? siteContent?.highlights_layman ?? siteContent?.highlights ?? [] : modeKey === "clinical" ? siteContent?.highlights_clinical ?? siteContent?.highlights ?? [] : siteContent?.highlights_scientist ?? siteContent?.highlights ?? [];
-  const stats = modeKey === "layman" ? siteContent?.stats_layman ?? siteContent?.stats ?? [] : modeKey === "clinical" ? siteContent?.stats_clinical ?? siteContent?.stats ?? [] : siteContent?.stats_scientist ?? siteContent?.stats ?? [];
-  const synthesis = modeKey === "layman" ? siteContent?.currentUnderstanding_layman ?? siteContent?.currentUnderstanding ?? null : modeKey === "clinical" ? siteContent?.currentUnderstanding_clinical ?? siteContent?.currentUnderstanding ?? null : siteContent?.currentUnderstanding_scientist ?? siteContent?.currentUnderstanding ?? null;
+  const highlights =
+    modeKey === "layman"
+      ? (siteContent?.highlights_layman ?? siteContent?.highlights ?? [])
+      : modeKey === "clinical"
+        ? (siteContent?.highlights_clinical ?? siteContent?.highlights ?? [])
+        : (siteContent?.highlights_scientist ?? siteContent?.highlights ?? []);
+  const stats =
+    modeKey === "layman"
+      ? (siteContent?.stats_layman ?? siteContent?.stats ?? [])
+      : modeKey === "clinical"
+        ? (siteContent?.stats_clinical ?? siteContent?.stats ?? [])
+        : (siteContent?.stats_scientist ?? siteContent?.stats ?? []);
+  const synthesis =
+    modeKey === "layman"
+      ? (siteContent?.currentUnderstanding_layman ??
+        siteContent?.currentUnderstanding ??
+        null)
+      : modeKey === "clinical"
+        ? (siteContent?.currentUnderstanding_clinical ??
+          siteContent?.currentUnderstanding ??
+          null)
+        : (siteContent?.currentUnderstanding_scientist ??
+          siteContent?.currentUnderstanding ??
+          null);
   const readingCopy = synthesis;
-  const studyCategories = ["All studies", ...Array.from(new Set(papers.map((paper) => paper.type))).sort()];
+  const studyCategories = [
+    "All studies",
+    ...Array.from(new Set(papers.map((paper) => paper.type))).sort(),
+  ];
   const normalizedStudySearch = studySearch.trim().toLowerCase();
   const filteredPapers = papers.filter((paper) => {
-    const searchable = [paper.title, paper.authors, paper.journal, paper.type, paper.summary, ...paper.tags, ...paper.symptomsIdentified].join(" ").toLowerCase();
+    const searchable = [
+      paper.title,
+      paper.authors,
+      paper.journal,
+      paper.type,
+      paper.summary,
+      ...paper.tags,
+      ...paper.symptomsIdentified,
+    ]
+      .join(" ")
+      .toLowerCase();
     return !normalizedStudySearch || searchable.includes(normalizedStudySearch);
   });
-  const papersByCategory = studyCategories.filter((cat) => cat !== "All studies").map((cat) => ({
-    category: cat,
-    papers: filteredPapers.filter((p) => p.type === cat),
-  }));
+  const papersByCategory = studyCategories
+    .filter((cat) => cat !== "All studies")
+    .map((cat) => ({
+      category: cat,
+      papers: filteredPapers.filter((p) => p.type === cat),
+    }));
 
   return (
     <motion.main
@@ -142,9 +189,13 @@ export default function Landing() {
     >
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="border-b border-[#dce7e3] bg-[#fbfcfb]">
-        {/* Row 1: title + login */}
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
-          <a href="/" className="flex items-center gap-3" aria-label="ZFHX4 Research Hub home">
+        {/* Desktop: single row with title | selector | subtitle+login */}
+        <div className="mx-auto hidden max-w-[1240px] items-center px-8 py-4 lg:px-10 sm:flex">
+          <a
+            href="/"
+            className="flex items-center gap-3"
+            aria-label="ZFHX4 Research Hub home"
+          >
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]">
               <Dna className="size-[19px]" strokeWidth={1.8} />
             </span>
@@ -152,30 +203,92 @@ export default function Landing() {
               ZFHX4 Research Hub
             </span>
           </a>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs font-medium text-[#6a7d79] sm:inline">A customer research resource</span>
-            <a
-              href="/auth"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
+
+          <div className="mx-6 flex flex-1 justify-center">
+            <div
+              className="grid grid-cols-3 items-stretch gap-1 rounded-lg border border-[#d5e2de] bg-white p-1"
+              aria-label="Choose how to explore the research"
             >
-              <LogIn className="size-4" />
-              <span className="hidden sm:inline">Log in</span>
-            </a>
-          </div>
-        </div>
-        {/* Row 2: friendly reading preferences — full width on mobile, inline on desktop */}
-        <div className="border-t border-[#edf1ef] sm:border-t-0">
-          <div className="mx-auto flex max-w-[1240px] items-center px-5 py-2 sm:justify-end sm:px-8 sm:py-0 lg:px-10">
-            <div className="grid w-full grid-cols-3 items-stretch gap-1 rounded-lg border border-[#d5e2de] bg-white p-1 sm:w-auto sm:min-w-[390px]" aria-label="Choose how to explore the research">
               {(["layman", "clinical", "scientist"] as const).map((level) => (
                 <button
                   key={level}
                   type="button"
                   onClick={() => setReadingLevel(level)}
-                  className={readingLevel === level ? "w-full rounded-md bg-[#18322f] px-2.5 py-2 text-[11px] font-semibold text-white" : "w-full rounded-md px-2.5 py-2 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"}
+                  className={
+                    readingLevel === level
+                      ? "rounded-md bg-[#18322f] px-2.5 py-2 text-[11px] font-semibold text-white"
+                      : "rounded-md px-2.5 py-2 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"
+                  }
                   aria-pressed={readingLevel === level}
                 >
-                  {level === "layman" ? "Easy to follow" : level === "clinical" ? "For care teams" : "Research deep dive"}
+                  {level === "layman"
+                    ? "Easy to follow"
+                    : level === "clinical"
+                      ? "For care teams"
+                      : "Research deep dive"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-[#6a7d79]">
+              A customer research resource
+            </span>
+            <a
+              href="/auth"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
+            >
+              <LogIn className="size-4" />
+              <span>Log in</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Mobile: title + login stacked above, selector below */}
+        <div className="sm:hidden">
+          <div className="mx-auto flex items-center justify-between px-5 py-4">
+            <a
+              href="/"
+              className="flex items-center gap-3"
+              aria-label="ZFHX4 Research Hub home"
+            >
+              <span className="flex size-9 items-center justify-center rounded-xl bg-[#18322f] text-[#d9f0e9]">
+                <Dna className="size-[19px]" strokeWidth={1.8} />
+              </span>
+              <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#18322f]">
+                ZFHX4 Research Hub
+              </span>
+            </a>
+            <a
+              href="/auth"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
+            >
+              <LogIn className="size-4" />
+            </a>
+          </div>
+          <div className="mx-auto max-w-[1240px] px-5 py-2">
+            <div
+              className="grid grid-cols-3 items-stretch gap-1 rounded-lg border border-[#d5e2de] bg-white p-1"
+              aria-label="Choose how to explore the research"
+            >
+              {(["layman", "clinical", "scientist"] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setReadingLevel(level)}
+                  className={
+                    readingLevel === level
+                      ? "rounded-md bg-[#18322f] px-2.5 py-2 text-[11px] font-semibold text-white"
+                      : "rounded-md px-2.5 py-2 text-[11px] font-medium text-[#71837f] hover:bg-[#f2f8f5]"
+                  }
+                  aria-pressed={readingLevel === level}
+                >
+                  {level === "layman"
+                    ? "Easy to follow"
+                    : level === "clinical"
+                      ? "For care teams"
+                      : "Research deep dive"}
                 </button>
               ))}
             </div>
@@ -206,7 +319,9 @@ export default function Landing() {
               className="max-w-2xl text-[clamp(2.35rem,5vw,4.6rem)] font-semibold leading-[1.02] tracking-[-0.055em] text-[#18322f]"
             >
               ZFHX4 loss of function causes a{" "}
-              <span className="text-[#398b74]">neurodevelopmental disorder</span>
+              <span className="text-[#398b74]">
+                neurodevelopmental disorder
+              </span>
             </motion.h1>
 
             {readingCopy ? (
@@ -236,8 +351,8 @@ export default function Landing() {
                 transition={{ delay: 0.2, duration: 0.45 }}
                 className="mt-6 max-w-xl text-base leading-7 text-[#58706b] sm:text-[17px]"
               >
-                Research about loss of function in ZFHX4, organized to help customers
-                and their care teams understand the evidence.
+                Research about loss of function in ZFHX4, organized to help
+                customers and their care teams understand the evidence.
               </motion.p>
             )}
           </div>
@@ -246,14 +361,19 @@ export default function Landing() {
           {stats.length > 0 && (
             <div className="mt-10 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#d4e5df] bg-[#d4e5df] sm:mt-14 sm:grid-cols-4">
               {stats.map((item) => (
-                <div key={item.label} className="bg-[#f8fbfa] px-4 py-4 sm:px-5 sm:py-5">
+                <div
+                  key={item.label}
+                  className="bg-[#f8fbfa] px-4 py-4 sm:px-5 sm:py-5"
+                >
                   <p className="text-xl font-semibold tracking-[-0.03em] text-[#18322f] sm:text-2xl">
                     {item.stat}
                   </p>
                   <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#718681]">
                     {item.label}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-[#96ada6]">{item.detail}</p>
+                  <p className="mt-0.5 text-[11px] text-[#96ada6]">
+                    {item.detail}
+                  </p>
                 </div>
               ))}
             </div>
@@ -287,8 +407,12 @@ export default function Landing() {
                 <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[#edf5f2] text-[#398b74]">
                   {iconMap[item.icon] ?? <FileText className="size-5" />}
                 </div>
-                <h3 className="text-base font-semibold text-[#18322f]">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#58706b]">{item.body}</p>
+                <h3 className="text-base font-semibold text-[#18322f]">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[#58706b]">
+                  {item.body}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -307,8 +431,9 @@ export default function Landing() {
                 Ask about the research
               </h2>
               <p className="mt-2 text-sm leading-6 text-[#6d837c]">
-                All analysis is generated for the {readingLevelLabels[readingLevel].toLowerCase()} reading level. Ask about findings,
-                genetics, symptoms, or specific studies.
+                All analysis is generated for the{" "}
+                {readingLevelLabels[readingLevel].toLowerCase()} reading level.
+                Ask about findings, genetics, symptoms, or specific studies.
               </p>
             </div>
 
@@ -346,8 +471,12 @@ export default function Landing() {
                   >
                     <span className="inline-flex gap-1">
                       <span className="animate-pulse">●</span>
-                      <span className="animate-pulse [animation-delay:150ms]">●</span>
-                      <span className="animate-pulse [animation-delay:300ms]">●</span>
+                      <span className="animate-pulse [animation-delay:150ms]">
+                        ●
+                      </span>
+                      <span className="animate-pulse [animation-delay:300ms]">
+                        ●
+                      </span>
                     </span>
                   </motion.div>
                 )}
@@ -358,9 +487,12 @@ export default function Landing() {
               {/* Suggested questions — only before first message, above input */}
               {chatMessages.length === 0 && !isTyping && (
                 <div className="border-t border-[#edf1ef] px-4 py-3 sm:px-5">
-                  <p className="mb-2 text-center text-xs font-medium text-[#7b8f89]">Try asking:</p>
+                  <p className="mb-2 text-center text-xs font-medium text-[#7b8f89]">
+                    Try asking:
+                  </p>
                   <div className="flex flex-wrap justify-center gap-2">
-                    {["What developmental features are associated with ZFHX4 loss of function?",
+                    {[
+                      "What developmental features are associated with ZFHX4 loss of function?",
                       "How was the ZFHX4 connection discovered?",
                       "What do zebrafish studies tell us?",
                       "Is this condition inherited?",
@@ -419,7 +551,8 @@ export default function Landing() {
             Read the evidence
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#71837f]">
-            {papers.length} published {papers.length === 1 ? "paper" : "papers"}. Search by topic, symptom, author, or journal.
+            {papers.length} published {papers.length === 1 ? "paper" : "papers"}
+            . Search by topic, symptom, author, or journal.
           </p>
         </div>
 
@@ -427,7 +560,12 @@ export default function Landing() {
           <div className="mb-8">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29a]" />
-              <Input value={studySearch} onChange={(event) => setStudySearch(event.target.value)} placeholder="Search studies, symptoms, genes, journals..." className="h-10 w-full border-[#d5e2de] pl-9" />
+              <Input
+                value={studySearch}
+                onChange={(event) => setStudySearch(event.target.value)}
+                placeholder="Search studies, symptoms, genes, journals..."
+                className="h-10 w-full border-[#d5e2de] pl-9"
+              />
             </div>
           </div>
         )}
@@ -435,107 +573,163 @@ export default function Landing() {
         {papers.length === 0 && (
           <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-16 text-center">
             <BookOpen className="mx-auto size-6 text-[#9aada7]" />
-            <h3 className="mt-4 text-base font-semibold text-[#29443e]">No papers published yet</h3>
+            <h3 className="mt-4 text-base font-semibold text-[#29443e]">
+              No papers published yet
+            </h3>
             <p className="mt-1 text-sm text-[#71837f]">
-              Research papers will appear here once published by the editorial team.
+              Research papers will appear here once published by the editorial
+              team.
             </p>
           </div>
         )}
 
         {filteredPapers.length === 0 && papers.length > 0 && (
-          <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-12 text-center text-sm text-[#71837f]">No studies match your search.</div>
+          <div className="rounded-2xl border border-dashed border-[#cddbd6] bg-white px-6 py-12 text-center text-sm text-[#71837f]">
+            No studies match your search.
+          </div>
         )}
 
-        {papersByCategory.map(({ category, papers: catPapers }) => (
-          catPapers.length > 0 && (
-            <div key={category} className="mb-8">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#18322f]">{category}</h3>
-                <span className="text-xs text-[#71837f]">{catPapers.length} {catPapers.length === 1 ? "study" : "studies"}</span>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                {catPapers.map((paper) => (
-                  <motion.article
-                    key={paper.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-30px" }}
-                    transition={{ duration: 0.3 }}
-                    className="group w-[340px] min-w-[340px] shrink-0 rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:w-[380px] sm:min-w-[380px]"
-                  >
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-medium text-[#96ada6]">{paper.year}</span>
-                      {paper.openAccess && (
-                        <span className="text-[11px] font-medium text-[#78918a]">Open access</span>
+        {papersByCategory.map(
+          ({ category, papers: catPapers }) =>
+            catPapers.length > 0 && (
+              <div key={category} className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-[#18322f]">
+                    {category}
+                  </h3>
+                  <span className="text-xs text-[#71837f]">
+                    {catPapers.length}{" "}
+                    {catPapers.length === 1 ? "study" : "studies"}
+                  </span>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                  {catPapers.map((paper) => (
+                    <motion.article
+                      key={paper.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: "-30px" }}
+                      transition={{ duration: 0.3 }}
+                      className="group w-[340px] min-w-[340px] shrink-0 rounded-2xl border border-[#dbe6e2] bg-white p-5 transition-colors hover:border-[#a8cabe] sm:w-[380px] sm:min-w-[380px]"
+                    >
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-medium text-[#96ada6]">
+                          {paper.year}
+                        </span>
+                        {paper.openAccess && (
+                          <span className="text-[11px] font-medium text-[#78918a]">
+                            Open access
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="mb-2 text-sm font-semibold leading-6 tracking-[-0.015em] text-[#18322f]">
+                        {paper.title}
+                      </h4>
+                      <p className="mb-3 text-xs text-[#71837f]">
+                        {paper.authors}{" "}
+                        <span className="text-[#b0bfba]">·</span>{" "}
+                        {paper.journal}
+                      </p>
+                      <p className="mb-3 text-xs leading-5 text-[#526965] line-clamp-3">
+                        {paper.summary}
+                      </p>
+                      {paper.keyFindings.length > 0 && (
+                        <div className="mb-3 rounded-xl bg-[#f5f8f7] p-3">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#648079]">
+                            Key findings
+                          </p>
+                          <ul className="space-y-1">
+                            {paper.keyFindings.slice(0, 2).map((finding) => (
+                              <li
+                                key={finding}
+                                className="flex items-start gap-1.5 text-[11px] leading-4 text-[#3b5c54]"
+                              >
+                                <ChevronRight className="mt-0.5 size-2.5 shrink-0 text-[#398b74]" />
+                                <span className="line-clamp-2">{finding}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
-                    </div>
-                    <h4 className="mb-2 text-sm font-semibold leading-6 tracking-[-0.015em] text-[#18322f]">
-                      {paper.title}
-                    </h4>
-                    <p className="mb-3 text-xs text-[#71837f]">
-                      {paper.authors} <span className="text-[#b0bfba]">·</span> {paper.journal}
-                    </p>
-                    <p className="mb-3 text-xs leading-5 text-[#526965] line-clamp-3">
-                      {paper.summary}
-                    </p>
-                    {paper.keyFindings.length > 0 && (
-                      <div className="mb-3 rounded-xl bg-[#f5f8f7] p-3">
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#648079]">Key findings</p>
-                        <ul className="space-y-1">
-                          {paper.keyFindings.slice(0, 2).map((finding) => (
-                            <li key={finding} className="flex items-start gap-1.5 text-[11px] leading-4 text-[#3b5c54]">
-                              <ChevronRight className="mt-0.5 size-2.5 shrink-0 text-[#398b74]" />
-                              <span className="line-clamp-2">{finding}</span>
-                            </li>
+                      {paper.tags.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-1">
+                          {paper.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded bg-[#f4f7f6] px-1.5 py-0.5 text-[10px] font-medium text-[#72847f]"
+                            >
+                              {tag}
+                            </span>
                           ))}
-                        </ul>
-                      </div>
-                    )}
-                    {paper.tags.length > 0 && (
-                      <div className="mb-3 flex flex-wrap gap-1">
-                        {paper.tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="rounded bg-[#f4f7f6] px-1.5 py-0.5 text-[10px] font-medium text-[#72847f]">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button asChild size="sm" className="h-8 flex-1 cursor-pointer gap-1.5 bg-[#398b74] px-3 text-[11px] text-white hover:bg-[#2d755f]">
-                        <a href={paper.link} target="_blank" rel="noopener noreferrer">Read <ExternalLink className="size-3" /></a>
-                      </Button>
-                      {paper.pdfLink && (
-                        <Button asChild variant="outline" size="sm" className="h-8 flex-1 cursor-pointer gap-1.5 border-[#d5e2de] px-3 text-[11px] text-[#526965] hover:bg-[#f5f8f7]">
-                          <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer">PDF <ExternalLink className="size-3" /></a>
-                        </Button>
+                        </div>
                       )}
-                    </div>
-                  </motion.article>
-                ))}
+                      <div className="flex gap-2">
+                        <Button
+                          asChild
+                          size="sm"
+                          className="h-8 flex-1 cursor-pointer gap-1.5 bg-[#398b74] px-3 text-[11px] text-white hover:bg-[#2d755f]"
+                        >
+                          <a
+                            href={paper.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Read <ExternalLink className="size-3" />
+                          </a>
+                        </Button>
+                        {paper.pdfLink && (
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-8 flex-1 cursor-pointer gap-1.5 border-[#d5e2de] px-3 text-[11px] text-[#526965] hover:bg-[#f5f8f7]"
+                          >
+                            <a
+                              href={paper.pdfLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              PDF <ExternalLink className="size-3" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </motion.article>
+                  ))}
+                </div>
               </div>
-            </div>
-          )
-        ))}
+            ),
+        )}
       </section>
 
       {/* ─── Footer ──────────────────────────────────────────────────────── */}
       <footer className="border-t border-[#dce7e3] bg-[#fbfcfb]">
         <div className="mx-auto max-w-[1240px] px-5 py-6 sm:px-8 lg:px-10">
           <p className="text-xs leading-5 text-[#83938f]">
-            This library is an information resource, not medical advice. Research findings can
-            change as new evidence becomes available. Always discuss papers and individual care
-            with your clinical team.
+            This library is an information resource, not medical advice.
+            Research findings can change as new evidence becomes available.
+            Always discuss papers and individual care with your clinical team.
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-xs leading-5 text-[#83938f]">
-            Prepared for customers{" "}
-            <span className="text-[#b1c0bb]">·</span>{" "}
-            <a href="/legal/medical" className="underline-offset-2 hover:underline">
+            Prepared for customers <span className="text-[#b1c0bb]">·</span>{" "}
+            <a
+              href="/legal/medical"
+              className="underline-offset-2 hover:underline"
+            >
               Medical information notice
             </a>{" "}
             <span className="text-[#b1c0bb]">·</span>{" "}
-            <a href="/legal/privacy" className="underline-offset-2 hover:underline">
+            <a
+              href="/legal/privacy"
+              className="underline-offset-2 hover:underline"
+            >
               Privacy
             </a>{" "}
             <span className="text-[#b1c0bb]">·</span>{" "}
-            <a href="/legal/terms" className="underline-offset-2 hover:underline">
+            <a
+              href="/legal/terms"
+              className="underline-offset-2 hover:underline"
+            >
               Terms
             </a>
           </p>
