@@ -7,12 +7,15 @@ import {
   FileText,
   LogIn,
   MessageCircle,
+  Pill,
   Search,
   Send,
   Sparkles,
+  Stethoscope,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -235,6 +238,14 @@ export default function Landing() {
             <span className="text-xs font-medium text-[#6a7d79]">
               A customer research resource
             </span>
+            <nav className="hidden items-center gap-1 lg:flex">
+              <Link to="/symptoms" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:bg-[#edf5f2] hover:text-[#286c59]">
+                <Stethoscope className="size-3.5" /> Symptoms
+              </Link>
+              <Link to="/medications" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#526965] transition-colors hover:bg-[#edf5f2] hover:text-[#286c59]">
+                <Pill className="size-3.5" /> Medications
+              </Link>
+            </nav>
             <a
               href="/auth"
               className="inline-flex items-center gap-2 rounded-lg bg-[#18322f] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b45]"
@@ -440,6 +451,15 @@ export default function Landing() {
             <div className="overflow-hidden rounded-2xl border border-[#d4e5df] bg-white shadow-sm">
               {/* Messages */}
               <div className="flex min-h-[180px] max-h-[380px] flex-col gap-3 overflow-y-auto p-5 sm:min-h-[220px] sm:max-h-[420px] sm:p-6">
+                {chatMessages.length === 0 && !isTyping && (
+                  <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+                    <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#edf5f2] to-[#d9ede6]">
+                      <MessageCircle className="size-7 text-[#398b74]" />
+                    </div>
+                    <p className="text-sm font-semibold text-[#3b5c54]">Type to get started</p>
+                    <p className="mt-1.5 max-w-[280px] text-xs leading-5 text-[#7b8f89]">Ask about ZFHX4 research, symptoms, genetics, or specific studies.</p>
+                  </div>
+                )}
                 <AnimatePresence initial={false}>
                   {chatMessages.map((msg) => (
                     <motion.div

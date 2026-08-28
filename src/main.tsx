@@ -13,6 +13,8 @@ import { ReadingLevelProvider } from "@/lib/reading-level";
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Workspace = lazy(() => import("./pages/Workspace.tsx"));
+const CommonSymptoms = lazy(() => import("./pages/CommonSymptoms.tsx"));
+const CommonMedications = lazy(() => import("./pages/CommonMedications.tsx"));
 const Legal = lazy(() => import("./pages/Legal.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -51,6 +53,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
             <Route path="/dashboard" element={<RequireAuth><Workspace /></RequireAuth>} />
+            <Route path="/symptoms" element={<CommonSymptoms />} />
+            <Route path="/medications" element={<CommonMedications />} />
             <Route path="/legal/:page" element={<Legal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

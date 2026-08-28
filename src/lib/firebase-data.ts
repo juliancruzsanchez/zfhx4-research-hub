@@ -44,6 +44,21 @@ export interface PublicPaper {
   rejectedAt?: { seconds: number; nanoseconds: number };
 }
 
+export interface CommonSymptom {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+}
+
+export interface CommonMedication {
+  id: string;
+  name: string;
+  purpose: string;
+  dosage: string;
+  sideEffects?: string;
+}
+
 export interface SiteContent {
   currentUnderstanding: string;
   highlights: Array<{ title: string; body: string; icon: string }>;
@@ -60,6 +75,8 @@ export interface SiteContent {
   stats_layman?: Array<{ stat: string; label: string; detail: string }>;
   stats_clinical?: Array<{ stat: string; label: string; detail: string }>;
   stats_scientist?: Array<{ stat: string; label: string; detail: string }>;
+  commonSymptoms?: CommonSymptom[];
+  commonMedications?: CommonMedication[];
 }
 
 /** Subscribe to all published papers for the homepage.
@@ -300,6 +317,52 @@ export function subscribeToSymptomReports(
     },
     (err) => {
       console.error("subscribeToSymptomReports error:", err);
+      onChange([]);
+    },
+  );
+}
+
+/* ─── Common symptoms & medications (admin-managed site content) ────────── */
+
+export async function updateCommonSymptoms(symptoms: CommonSymptom[]) {
+  const ref = doc(firestore, "siteContent", "main");
+  await setDoc(ref, { commonSymptoms: symptoms }, { merge: true });
+}
+
+export async function updateCommonMedications(medications: CommonMedication[]) {
+  const ref = doc(firestore, "siteContent", "main");
+  await setDoc(ref, { commonMedications: medications }, { merge: true });
+}
+
+/** Subscribe to common symptoms for public display. */
+export function subscribeToCommonSymptoms(
+  onChange: (symptoms: CommonSymptom[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(firestore, "siteContent", "main"),
+    (snap) => {
+      const data = snap.exists() ? (snap.data() as SiteContent) : null;
+      onChange(data?.commonSymptoms ?? []);
+    },
+    (err) => {
+      console.error("subscribeToCommonSymptoms error:", err);
+      onChange([]);
+    },
+  );
+}
+
+/** Subscribe to common medications for public display. */
+export function subscribeToCommonMedications(
+  onChange: (medications: CommonMedication[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(firestore, "siteContent", "main"),
+    (snap) => {
+      const data = snap.exists() ? (snap.data() as SiteContent) : null;
+      onChange(data?.commonMedications ?? []);
+    },
+    (err) => {
+      console.error("subscribeToCommonMedications error:", err);
       onChange([]);
     },
   );

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Activity, Archive, Bot, BookOpen, CheckCircle2, ExternalLink, FileText, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Plus, RefreshCcw, Send, Settings2, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { Activity, Archive, Bot, BookOpen, CheckCircle2, ExternalLink, FileText, FileUp, Loader2, LogOut, MessageCircle, Paperclip, Pill, Plus, RefreshCcw, Send, Settings2, Sparkles, Stethoscope, Trash2, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { archivePaper, chatWithDocument, publishPaper, refreshPapers, synthesizeUnderstanding } from "@/lib/firebase-functions";
-import { createDocument, createSymptomReport, saveUserProfile, subscribeToAllPapers, subscribeToChat, subscribeToDocuments, subscribeToSymptomReports, subscribeToUserProfile, type DocumentChatMessage, type Medication, type PublicPaper, type ResearchDocument, type SymptomReport, type UserProfile } from "@/lib/firebase-data";
+import { createDocument, createSymptomReport, saveUserProfile, subscribeToAllPapers, subscribeToChat, subscribeToCommonMedications, subscribeToCommonSymptoms, subscribeToDocuments, subscribeToSymptomReports, subscribeToUserProfile, updateCommonMedications, updateCommonSymptoms, type CommonMedication, type CommonSymptom, type DocumentChatMessage, type Medication, type PublicPaper, type ResearchDocument, type SymptomReport, type UserProfile } from "@/lib/firebase-data";
 
 function formatDate(value?: { seconds: number }) {
   if (!value) return "Processing now";
@@ -31,7 +31,7 @@ export default function Workspace() {
   const [isAsking, setIsAsking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [researchConsent, setResearchConsent] = useState(false);
-  const [activeView, setActiveView] = useState<"documents" | "experiences" | "profile" | "papers">("documents");
+  const [activeView, setActiveView] = useState<"documents" | "experiences" | "profile" | "papers" | "symptoms" | "medications">("documents");
   const [profile, setProfile] = useState<UserProfile>({ userId: "", ailments: [], diagnoses: [], medications: [] });
   const [profileDraft, setProfileDraft] = useState<UserProfile>({ userId: "", ailments: [], diagnoses: [], medications: [] });
   const [profileSaved, setProfileSaved] = useState(false);
@@ -45,6 +45,13 @@ export default function Workspace() {
   const ailmentSuggestions = ["Developmental delay", "Speech or language differences", "Seizures", "Sleep difficulties", "Movement differences", "Feeding difficulties"];
   const diagnosisSuggestions = ["ZFHX4-related disorder", "Kleefstra syndrome 2", "Epilepsy", "Autism spectrum disorder", "Developmental delay"];
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Common symptoms & medications (admin-managed)
+  const [commonSymptoms, setCommonSymptoms] = useState<CommonSymptom[]>([]);
+  const [commonMedicationsList, setCommonMedicationsList] = useState<CommonMedication[]>([]);
+  const [symptomDraft, setSymptomDraft] = useState({ name: "", description: "", category: "" });
+  const [medDraft, setMedDraft] = useState({ name: "", purpose: "", dosage: "", sideEffects: "" });
+  const symptomCategories = ["Neurological", "Developmental", "Behavioral", "Physical", "Communication", "Sensory"];
 
   useEffect(() => {
     if (!user) return;
@@ -81,6 +88,16 @@ export default function Workspace() {
   useEffect(() => {
     if (!user || !isAdmin) return;
     return subscribeToAllPapers(setAllPapers);
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    return subscribeToCommonSymptoms(setCommonSymptoms);
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    return subscribeToCommonMedications(setCommonMedicationsList);
   }, [user, isAdmin]);
 
   const selectedDocument = useMemo(() => documents.find((document) => document.id === selectedDocumentId) ?? null, [documents, selectedDocumentId]);
@@ -223,6 +240,51 @@ export default function Workspace() {
     navigate("/");
   }
 
+  function addCommonSymptom() {
+    if (!symptomDraft.name.trim() || !symptomDraft.category.trim()) {
+      toast.error("Please enter a name and category.");
+      return;
+    }
+    const symptom: CommonSymptom = {
+      id: crypto.randomUUID(),
+      name: symptomDraft.name.trim(),
+      description: symptomDraft.description.trim(),
+      category: symptomDraft.category.trim(),
+    };
+    updateCommonSymptoms([...commonSymptoms, symptom])
+      .then(() => { toast.success("Symptom added."); setSymptomDraft({ name: "", description: "", category: "" }); })
+      .catch(() => toast.error("Failed to add symptom."));
+  }
+
+  function removeCommonSymptom(id: string) {
+    updateCommonSymptoms(commonSymptoms.filter((s) => s.id !== id))
+      .then(() => toast.success("Symptom removed."))
+      .catch(() => toast.error("Failed to remove symptom."));
+  }
+
+  function addCommonMedication() {
+    if (!medDraft.name.trim() || !medDraft.purpose.trim()) {
+      toast.error("Please enter a name and purpose.");
+      return;
+    }
+    const med: CommonMedication = {
+      id: crypto.randomUUID(),
+      name: medDraft.name.trim(),
+      purpose: medDraft.purpose.trim(),
+      dosage: medDraft.dosage.trim(),
+      sideEffects: medDraft.sideEffects.trim() || undefined,
+    };
+    updateCommonMedications([...commonMedicationsList, med])
+      .then(() => { toast.success("Medication added."); setMedDraft({ name: "", purpose: "", dosage: "", sideEffects: "" }); })
+      .catch(() => toast.error("Failed to add medication."));
+  }
+
+  function removeCommonMedication(id: string) {
+    updateCommonMedications(commonMedicationsList.filter((m) => m.id !== id))
+      .then(() => toast.success("Medication removed."))
+      .catch(() => toast.error("Failed to remove medication."));
+  }
+
   return (
     <main className="min-h-screen bg-[#f6f8f7] text-[#18322f]">
       <header className="border-b border-[#dce7e3] bg-[#fbfcfb]">
@@ -245,6 +307,8 @@ export default function Workspace() {
           <Button variant="ghost" onClick={() => setActiveView("experiences")} className={activeView === "experiences" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Activity className="size-4" /> My experiences</Button>
           <Button variant="ghost" onClick={() => setActiveView("profile")} className={activeView === "profile" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Settings2 className="size-4" /> My health profile</Button>
           {isAdmin ? <Button variant="ghost" onClick={() => setActiveView("papers")} className={activeView === "papers" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><FileText className="size-4" /> Research papers {allPapers.filter((p) => p.status === "pending").length > 0 && <Badge className="ml-auto bg-[#398b74] text-white">{allPapers.filter((p) => p.status === "pending").length}</Badge>}</Button> : null}
+          {isAdmin ? <Button variant="ghost" onClick={() => setActiveView("symptoms")} className={activeView === "symptoms" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Stethoscope className="size-4" /> Common symptoms</Button> : null}
+          {isAdmin ? <Button variant="ghost" onClick={() => setActiveView("medications")} className={activeView === "medications" ? "h-11 w-full cursor-pointer justify-start gap-3 bg-[#e7f4ef] text-[#286c59]" : "h-11 w-full cursor-pointer justify-start gap-3 text-[#698079]"}><Pill className="size-4" /> Common medications</Button> : null}
           <div className="mt-8 border-t border-[#dce7e3] px-1 pt-5 text-xs leading-5 text-[#82938e]">Uploaded records stay associated with your account. Do not upload anything you do not have permission to share.</div>
         </aside>
 
@@ -431,6 +495,94 @@ export default function Workspace() {
                   </div>
                 </div>
               )}
+            </div>
+          ) : activeView === "symptoms" ? (
+            /* ─── Common symptoms management ───────────────────────────── */
+            <div className="max-w-4xl space-y-6">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm text-[#6d837c]">Public symptom reference</p>
+                  <h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">Common symptoms</h2>
+                  <p className="mt-3 text-sm leading-6 text-[#71837f]">
+                    Manage the symptoms shown on the public <a href="/symptoms" target="_blank" className="underline-offset-2 hover:underline">symptoms page</a>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Add symptom form */}
+              <div className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6">
+                <h3 className="font-semibold">Add a symptom</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input value={symptomDraft.name} onChange={(e) => setSymptomDraft({ ...symptomDraft, name: e.target.value })} placeholder="Symptom name" className="border-[#d5e2de]" />
+                  <div className="relative">
+                    <Input value={symptomDraft.category} onChange={(e) => setSymptomDraft({ ...symptomDraft, category: e.target.value })} placeholder="Category" className="border-[#d5e2de]" list="symptom-cat-suggestions" />
+                    <datalist id="symptom-cat-suggestions">{symptomCategories.map((cat) => <option key={cat} value={cat} />)}</datalist>
+                  </div>
+                </div>
+                <Textarea value={symptomDraft.description} onChange={(e) => setSymptomDraft({ ...symptomDraft, description: e.target.value })} placeholder="Brief description for the public page" className="min-h-[80px] border-[#d5e2de]" />
+                <Button type="button" onClick={addCommonSymptom} className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]">
+                  <Plus className="size-4" /> Add symptom
+                </Button>
+              </div>
+
+              {/* Existing symptoms */}
+              <div className="space-y-3">
+                {commonSymptoms.length === 0 && <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-5 py-10 text-center text-sm text-[#82938e]">No symptoms added yet.</div>}
+                {commonSymptoms.map((symptom) => (
+                  <div key={symptom.id} className="flex items-start justify-between gap-3 rounded-xl border border-[#dbe6e2] bg-white p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block rounded-full bg-[#edf5f2] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#286c59]">{symptom.category}</span>
+                        <p className="font-medium text-[#29483f]">{symptom.name}</p>
+                      </div>
+                      {symptom.description && <p className="mt-1 text-sm text-[#71837f]">{symptom.description}</p>}
+                    </div>
+                    <button type="button" onClick={() => removeCommonSymptom(symptom.id)} className="cursor-pointer text-[#8a6d5a]" aria-label={`Remove ${symptom.name}`}><Trash2 className="size-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : activeView === "medications" ? (
+            /* ─── Common medications management ─────────────────────────── */
+            <div className="max-w-4xl space-y-6">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm text-[#6d837c]">Public medication reference</p>
+                  <h2 className="mt-1 text-3xl font-semibold tracking-[-0.05em]">Common medications</h2>
+                  <p className="mt-3 text-sm leading-6 text-[#71837f]">
+                    Manage the medications shown on the public <a href="/medications" target="_blank" className="underline-offset-2 hover:underline">medications page</a>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Add medication form */}
+              <div className="space-y-4 rounded-2xl border border-[#dbe6e2] bg-white p-5 sm:p-6">
+                <h3 className="font-semibold">Add a medication</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input value={medDraft.name} onChange={(e) => setMedDraft({ ...medDraft, name: e.target.value })} placeholder="Medication name" className="border-[#d5e2de]" />
+                  <Input value={medDraft.purpose} onChange={(e) => setMedDraft({ ...medDraft, purpose: e.target.value })} placeholder="What it is used for" className="border-[#d5e2de]" />
+                  <Input value={medDraft.dosage} onChange={(e) => setMedDraft({ ...medDraft, dosage: e.target.value })} placeholder="Common dosages" className="border-[#d5e2de]" />
+                  <Input value={medDraft.sideEffects} onChange={(e) => setMedDraft({ ...medDraft, sideEffects: e.target.value })} placeholder="Possible side effects (optional)" className="border-[#d5e2de]" />
+                </div>
+                <Button type="button" onClick={addCommonMedication} className="cursor-pointer gap-2 bg-[#398b74] text-white hover:bg-[#2d755f]">
+                  <Plus className="size-4" /> Add medication
+                </Button>
+              </div>
+
+              {/* Existing medications */}
+              <div className="space-y-3">
+                {commonMedicationsList.length === 0 && <div className="rounded-2xl border border-dashed border-[#cbdad5] bg-white px-5 py-10 text-center text-sm text-[#82938e]">No medications added yet.</div>}
+                {commonMedicationsList.map((med) => (
+                  <div key={med.id} className="flex items-start justify-between gap-3 rounded-xl border border-[#dbe6e2] bg-white p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-[#29483f]">{med.name} <span className="font-normal text-[#71837f]">· {med.dosage}</span></p>
+                      <p className="mt-1 text-sm text-[#526965]">For: {med.purpose}</p>
+                      {med.sideEffects && <p className="mt-1 text-xs text-[#80928c]">Side effects: {med.sideEffects}</p>}
+                    </div>
+                    <button type="button" onClick={() => removeCommonMedication(med.id)} className="cursor-pointer text-[#8a6d5a]" aria-label={`Remove ${med.name}`}><Trash2 className="size-4" /></button>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
         </section>

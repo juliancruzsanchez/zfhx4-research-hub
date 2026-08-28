@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 export type ReadingLevel = "layman" | "clinical" | "scientist";
 
@@ -17,12 +17,12 @@ export function ReadingLevelProvider({ children }: { children: ReactNode }) {
     return saved === "clinical" || saved === "scientist" ? saved : "layman";
   });
 
-  const setReadingLevel = (level: ReadingLevel) => {
+  const setReadingLevel = useCallback((level: ReadingLevel) => {
     setReadingLevelState(level);
     window.localStorage.setItem(STORAGE_KEY, level);
-  };
+  }, []);
 
-  const value = useMemo(() => ({ readingLevel, setReadingLevel }), [readingLevel]);
+  const value = useMemo(() => ({ readingLevel, setReadingLevel }), [readingLevel, setReadingLevel]);
   return <ReadingLevelContext.Provider value={value}>{children}</ReadingLevelContext.Provider>;
 }
 
