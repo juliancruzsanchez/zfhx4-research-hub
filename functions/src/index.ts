@@ -85,7 +85,7 @@ const CHAT_SYSTEM = `You are a research assistant for a ZFHX4 Research Hub. Answ
 - Do not provide medical advice or diagnoses.`;
 
 export const chatAboutResearch = onCall(
-  { memory: "256MiB", timeoutSeconds: 30, secrets: [GROQ_API_KEY] },
+  { memory: "256MiB", timeoutSeconds: 30, cors: true, secrets: [GROQ_API_KEY] },
   async (request) => {
     const { message, history, mode } = request.data as {
       message: string;
