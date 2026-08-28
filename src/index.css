@@ -143,3 +143,12 @@
   scrollbar-width: thin;
   scrollbar-color: #d5e2de transparent;
 }
+
+/* Scroll snapping for horizontal scrollers */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-snap-x > * {
+  scroll-snap-align: start;
+}
