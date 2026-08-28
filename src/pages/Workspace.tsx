@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { archivePaper, chatWithDocument, publishPaper, refreshPapers, synthesizeUnderstanding } from "@/lib/firebase-functions";
 import { createDocument, createSymptomReport, saveUserProfile, subscribeToAllPapers, subscribeToChat, subscribeToCommonMedications, subscribeToCommonSymptoms, subscribeToDocuments, subscribeToSymptomReports, subscribeToUserProfile, updateCommonMedications, updateCommonSymptoms, type CommonMedication, type CommonSymptom, type DocumentChatMessage, type Medication, type PublicPaper, type ResearchDocument, type SymptomReport, type UserProfile } from "@/lib/firebase-data";
@@ -20,7 +21,7 @@ function formatDate(value?: { seconds: number }) {
 
 export default function Workspace() {
   const { user, signOut } = useAuth();
-  const isAdmin = user?.email?.toLowerCase() === "admin@example.com";
+  const isAdmin = useAdmin(user);
   const navigate = useNavigate();
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -61,10 +62,12 @@ export default function Workspace() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !selectedDocumentId) {
-      setMessages([]);
-      return;
-    }
+    // The chat panel is only rendered when a document is selected, so
+    // when selectedDocumentId is null the messages array is unused and
+    // we can skip the Firestore subscription entirely. Returning
+    // undefined is the documented way to opt out of the effect's
+    // cleanup path.
+    if (!user || !selectedDocumentId) return;
     return subscribeToChat(user.uid, selectedDocumentId, setMessages);
   }, [user, selectedDocumentId]);
 
@@ -144,7 +147,11 @@ export default function Workspace() {
     const item = value.trim();
     if (!item || profileDraft[kind].some((existing) => existing.toLowerCase() === item.toLowerCase())) return;
     setProfileDraft((current) => ({ ...current, [kind]: [...current[kind], item] }));
-    kind === "ailments" ? setAilmentInput("") : setDiagnosisInput("");
+    if (kind === "ailments") {
+      setAilmentInput("");
+    } else {
+      setDiagnosisInput("");
+    }
   }
 
   function addMedication() {

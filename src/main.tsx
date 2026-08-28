@@ -1,8 +1,8 @@
 import "@vly-ai/integrations";
 import { Toaster } from "@/components/ui/sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
-import { InstrumentationProvider } from "@/instrumentation.tsx";
 import { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
@@ -43,7 +43,7 @@ function RouteSyncer() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <VlyToolbar />
-    <InstrumentationProvider>
+    <ErrorBoundary>
       <BrowserRouter>
         <ReadingLevelProvider>
           <RouteSyncer />
@@ -62,6 +62,6 @@ createRoot(document.getElementById("root")!).render(
         </ReadingLevelProvider>
       </BrowserRouter>
       <Toaster />
-    </InstrumentationProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

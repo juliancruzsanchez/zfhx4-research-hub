@@ -1,0 +1,146 @@
+# ZFHX4 Research Hub — Agent Guide
+
+This file is the entry point for AI coding agents (Mavis, Codex, Cursor,
+Aider, Devin, Gemini CLI, …) and human contributors working in this
+repository. Read it before making changes.
+
+## What this project is
+
+A patient-facing research workspace for organising ZFHX4 papers, private
+medical-record PDFs, AI-extracted findings, document questions, and
+lived experiences. Lives in the open so caregivers and clinicians can
+see what is being built.
+
+## Stack
+
+- **Frontend**: Vite + React 19 + TypeScript + Tailwind v4
+- **Backend**: Firebase Auth + Cloud Firestore + Firebase Storage +
+  Firebase Functions (Node 20, 2nd gen)
+- **AI**: Groq (`llama-3.1-8b-instant`) called from Functions, never
+  from the browser
+- **Hosting**: Cloudflare Workers serving the Vite `dist/`
+- **Tooling**: Bun for installs, ESLint 9 flat config, Prettier 3,
+  TypeScript 5.9
+
+## Required reading before touching code
+
+1. `README.md` — what the project does and how it is deployed
+2. `firestore.rules` and `storage.rules` — the security boundary
+3. `functions/src/index.ts` — the callable functions surface
+4. `.github/CONTRIBUTING.md` — **commit and PR naming scheme** (this is
+   enforced by tooling, not a suggestion)
+5. This file — the conventions agents are expected to follow
+
+## Commit and PR naming scheme
+
+This repo uses [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+Every commit subject and every PR title MUST start with one of:
+
+```
+feat fix docs refactor perf test build ci chore style revert
+```
+
+followed by an optional `(scope)` and a short imperative subject. See
+`.github/CONTRIBUTING.md` for examples and breaking-change rules.
+
+The rules are enforced:
+
+- **Locally** by `commitlint` via `.husky/commit-msg`
+- **In CI** by `.github/workflows/lint-pr-title.yml` using
+  `wagoid/commitlint-github-action`
+
+If you (an agent) are about to produce a commit, run it through the
+same `commitlint` rules a human would:
+
+```bash
+echo "feat(workspace): add new field" | npx commitlint --config commitlint.config.cjs
+```
+
+## Branch naming
+
+Branch names follow the same `type/scope-kebab-desc` shape as commits.
+One logical change per branch. See `.github/CONTRIBUTING.md`.
+
+## Architectural rules (do not break)
+
+- **Never put a secret in the browser bundle.** Groq keys, service
+  account JSON, and any other server credential belongs in Firebase
+  Functions secrets or Cloudflare worker secrets, not in `import.meta.env`
+  prefixed with `VITE_`. The `VITE_` prefix only marks values as
+  intentionally public (e.g. the Firebase web SDK config).
+- **Never call Groq or any AI provider from client code.** All AI calls
+  go through a Cloud Function so the key is never exposed.
+- **Server-side admin checks live in Functions.** The client may
+  *request* an admin action; the function decides whether to honour it.
+  Admin gating in the UI is a UX nicety, not a security control.
+- **User data is private.** Document uploads, profile data, and symptom
+  reports must never leak across users. The Firestore rules in
+  `firestore.rules` are the contract; do not weaken them.
+- **Error reporting stays in the user's session.** Do not add a third
+  party SDK that ships runtime error stacks off-device. The previous
+  vly `InstrumentationProvider` was removed for this reason.
+
+## Common commands
+
+```bash
+bun install              # install JS deps
+bun run lint             # eslint (must pass before commit)
+bun run build            # tsc -b && vite build
+bun run build:functions  # tsc for the Firebase Functions package
+bun run build:worker     # vite build + wrangler deploy
+```
+
+Run the full pre-commit + pre-push flow manually if you bypassed hooks:
+
+```bash
+bun run lint
+bun run build
+```
+
+## Project layout
+
+```
+src/
+  pages/        # top-level routes (Landing, Auth, Workspace, Legal, NotFound)
+  components/   # shared UI; components/ui is generated shadcn-style
+  hooks/        # React hooks (use-auth, use-mobile)
+  lib/          # framework integrations (firebase, firebase-data, firebase-functions, reading-level)
+  assets/       # static assets imported by the bundler
+  convex/       # legacy scaffold, will be removed
+public/         # static assets served as-is (logo, manifest)
+functions/
+  src/          # Firebase Functions (TypeScript, Node 20, 2nd gen)
+worker/         # Cloudflare Worker entry (serves dist/, exposes /api/health)
+```
+
+## Style
+
+- TypeScript `strict: true` is on. Do not silence it.
+- Tailwind utility classes in JSX, no separate `.css` files unless
+  there is no other option. Global tokens live in `src/index.css`.
+- Prefer named exports for components; default exports only for route
+  components imported by `React.lazy`.
+- Keep components under ~250 lines. Extract a sub-component or a hook
+  before reaching for inline JSX gymnastics.
+
+## Things agents routinely get wrong here
+
+- The site was originally generated by a small model scaffold that
+  included unused dependencies and a 3rd-party error reporter. The
+  "remove" PRs in this repo address that. **Do not re-introduce the
+  vly toolbar, the convex auth files, or the `InstrumentationProvider`.**
+- The `convex-vendor` chunk in `vite.config.ts` is empty in production
+  builds. If you touch chunking, run `bun run build` and check the
+  chunk graph.
+- `useEffect` `setState` is flagged by the stricter React Hooks rules in
+  this project. Use the subscription callback or move the reset into the
+  effect's event handler.
+- The `firebase-functions.ts` module exports `analyzeDocument` and
+  `synthesizeFindings`, but they are dead exports. If a task seems to
+  need them, the right answer is usually a new function in
+  `functions/src/`, not resurrecting the old client wrapper.
+
+## Where to ask for help
+
+Open a GitHub issue or PR. The repo is small enough that a thoughtful
+question usually gets a same-day answer.
